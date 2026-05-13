@@ -4,18 +4,20 @@ $title = $document->getTitle();
 $description = $document->getDescription();
 $keywords = $document->getKeywords();
 $styles = $document->getStyles();
-$scripts = $document->getScripts(); 
+$scripts = $document->getScripts();
 $query_string = '';
 if (!empty($request->get)) {
-    $inc=1;foreach ($request->get as $key => $value) {
-      if (!in_array($key, array('from', 'to', 'filter','ftype', 'type'))) {
-        if ($inc==1) {
-            $query_string .= '?'.$key.'='.$value;
-        } else {
-            $query_string .= '&'.$key.'='.$value;
+    $inc = 1;
+    foreach ($request->get as $key => $value) {
+        if (!in_array($key, array('from', 'to', 'filter', 'ftype', 'type'))) {
+            if ($inc == 1) {
+                $query_string .= '?' . $key . '=' . $value;
+            } else {
+                $query_string .= '&' . $key . '=' . $value;
+            }
         }
-      }
-    $inc++;}
+        $inc++;
+    }
 } else {
     $query_string = '?filter=yes';
 }
@@ -23,8 +25,9 @@ $query_string = str_replace(array('&'), '?', $query_string);
 $demo_text = 'This is a demo version. Data will be reset in every 6 hours interval. <a style="color: #b3ffe0;font-weight: bold;border: 1px solid #fff;padding: 5px 10px;text-decoration: none;text-transform: uppercase;" href="http://bit.ly/Modern-POS">Buy Now &rarr;</a>';
 ?>
 <!DOCTYPE html>
-<html lang="<?php echo $document->langTag($active_lang);?>" <?php echo !isset($angular_disabled) ? 'ng-app="angularApp"' : null; ?>>
-  <head>
+<html lang="<?php echo $document->langTag(isset($active_lang) ? $active_lang : null); ?>" <?php echo !isset($angular_disabled) ? 'ng-app="angularApp"' : null; ?>>
+
+<head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title><?php echo $title ? $title . ' &raquo; ' : null; ?><?php echo store('name'); ?></title>
@@ -33,12 +36,12 @@ $demo_text = 'This is a demo version. Data will be reset in every 6 hours interv
 
     <!-- Meta Description -->
     <?php if ($description) : ?>
-    <meta name="description" content="<?php echo $description; ?>">
+        <meta name="description" content="<?php echo $description; ?>">
     <?php endif; ?>
 
     <!-- Meta Keywords -->
     <?php if ($keywords) : ?>
-    <meta name="keywords" content="<?php echo $keywords; ?>">
+        <meta name="keywords" content="<?php echo $keywords; ?>">
     <?php endif; ?>
 
     <!-- Favicon -->
@@ -52,12 +55,12 @@ $demo_text = 'This is a demo version. Data will be reset in every 6 hours interv
 
         <link type="text/css" href="../assets/itsolution24/cssmin/main.css" type="text/css" rel="stylesheet">
 
-    <?php  else: ?>
-  
-    <!-- Plugin CSS -->
+    <?php else: ?>
+
+        <!-- Plugin CSS -->
 
         <!-- Bootstrap CSS -->
-        <link type="text/css" href="../assets/bootstrap/css/bootstrap<?php echo isRTL() ? '-rtl' : null;?>.min.css" type="text/css" rel="stylesheet">
+        <link type="text/css" href="../assets/bootstrap/css/bootstrap<?php echo isRTL() ? '-rtl' : null; ?>.min.css" type="text/css" rel="stylesheet">
 
         <!-- jquery UI CSS -->
         <link type="text/css" href="../assets/jquery-ui/jquery-ui.min.css" type="text/css" rel="stylesheet">
@@ -92,7 +95,7 @@ $demo_text = 'This is a demo version. Data will be reset in every 6 hours interv
         <!-- Filemanager Main CSS -->
         <link type="text/css" href="../assets/itsolution24/css/filemanager/main.css" type="text/css" rel="stylesheet">
 
-    <!-- Theme CSS -->
+        <!-- Theme CSS -->
         <link type="text/css" href="../assets/itsolution24/css/theme.css" type="text/css" rel="stylesheet">
 
         <!-- Skin Black CSS -->
@@ -116,9 +119,9 @@ $demo_text = 'This is a demo version. Data will be reset in every 6 hours interv
         <!-- Main CSS -->
         <link href="../assets/itsolution24/css/main.css" type="text/css" rel="stylesheet">
 
-        <?php if (isRTL()) :?>
+        <?php if (isRTL()) : ?>
             <link href="../assets/itsolution24/css/rtl.css" type="text/css" rel="stylesheet">
-        <?php endif;?>
+        <?php endif; ?>
 
         <!-- Responsive CSS -->
         <link href="../assets/itsolution24/css/responsive.css" type="text/css" rel="stylesheet">
@@ -130,17 +133,17 @@ $demo_text = 'This is a demo version. Data will be reset in every 6 hours interv
 
     <!-- Add Runtime CSS -->
     <?php foreach ($styles as $style) : ?>
-    <link type="text/css" href="<?php echo $style['href']; ?>" rel="<?php echo $style['rel']; ?>" media="<?php echo $style['media']; ?>">
+        <link type="text/css" href="<?php echo $style['href']; ?>" rel="<?php echo $style['rel']; ?>" media="<?php echo $style['media']; ?>">
     <?php endforeach; ?>
 
     <script type="text/javascript">
-        var baseUrl = "<?php echo trim(root_url(),'/'); ?>";
+        var baseUrl = "<?php echo trim(root_url(), '/'); ?>";
         var adminDir = "<?php echo ADMINDIRNAME; ?>";
-        var user = <?php echo json_encode(array_diff_key(get_the_user(user_id()), array_flip(array('password','raw_password','pass_reset_code','reset_code_time')))); ?>;
-        var lang = "<?php echo $active_lang;?>";
-        var settings = <?php echo json_encode(array_diff_key(get_all_preference(), array_flip(array('smtp_password','ftp_password')))); ?>;
-        var store = <?php echo json_encode(array_diff_key(store(), array_flip(array('smtp_password','ftp_password','preference')))); ?>;
-        var isInstallment = <?php echo INSTALLMENT && (user_group_id() == 1 || has_permission('access', 'create_installment')) ? 1 : 0;?>;
+        var user = <?php echo json_encode(array_diff_key(get_the_user(user_id()), array_flip(array('password', 'raw_password', 'pass_reset_code', 'reset_code_time')))); ?>;
+        var lang = "<?php echo isset($active_lang) ? $active_lang : null; ?>";
+        var settings = <?php echo json_encode(array_diff_key(get_all_preference(), array_flip(array('smtp_password', 'ftp_password')))); ?>;
+        var store = <?php echo json_encode(array_diff_key(store(), array_flip(array('smtp_password', 'ftp_password', 'preference')))); ?>;
+        var isInstallment = <?php echo INSTALLMENT && (user_group_id() == 1 || has_permission('access', 'create_installment')) ? 1 : 0; ?>;
         var totalProduct = <?php echo total_product(); ?>;
         var deviceType = '<?php echo device_type(); ?>';
         var filemanager = '<?php echo get_preference('ftp_hostname') && get_preference('ftp_username') ? 'ftp' : 'local'; ?>';
@@ -150,7 +153,7 @@ $demo_text = 'This is a demo version. Data will be reset in every 6 hours interv
         <?php else: ?>
             var logo = '<?php echo root_url(); ?>/assets/itsolution24/img/logo-favicons/nologo.png';
         <?php endif; ?>
-        var sendReportEmail = '<?php echo user_group_id() == 1 || has_permission('access', 'send_report_via_email');?>';
+        var sendReportEmail = '<?php echo user_group_id() == 1 || has_permission('access', 'send_report_via_email'); ?>';
     </script>
 
     <?php if (DEMO || USECOMPILEDASSET) : ?>
@@ -178,7 +181,7 @@ $demo_text = 'This is a demo version. Data will be reset in every 6 hours interv
         <script src="../assets/datepicker/bootstrap-datepicker.js" type="text/javascript"></script>
 
         <!-- Bootstrap Timepicker JS-->
-        <script src="../assets/timepicker/bootstrap-timepicker.min.js" type="text/javascript" ></script>
+        <script src="../assets/timepicker/bootstrap-timepicker.min.js" type="text/javascript"></script>
 
         <!-- Bootstrap3 Wysihtml5 All JS -->
         <script src="../assets/bootstrap-wysihtml5/bootstrap3-wysihtml5.all.min.js" type="text/javascript"></script>
@@ -217,7 +220,7 @@ $demo_text = 'This is a demo version. Data will be reset in every 6 hours interv
         <script src="../assets/DataTables/datatables.min.js" type="text/javascript"></script>
 
         <!-- Angular JS -->
-        <script src="../assets/itsolution24/angularmin/angular.js" type="text/javascript"></script> 
+        <script src="../assets/itsolution24/angularmin/angular.js" type="text/javascript"></script>
 
         <!-- Angular App JS -->
         <script src="../assets/itsolution24/angular/angularApp.js" type="text/javascript"></script>
@@ -229,7 +232,8 @@ $demo_text = 'This is a demo version. Data will be reset in every 6 hours interv
         <script src="../assets/itsolution24/angularmin/filemanager.js" type="text/javascript"></script>
     <?php endif; ?>
 </head>
-<body class="hold-transition sidebar-mini<?php echo $body_class; ?><?php echo isRTL() ? ' rtl' : null;?>">
-<div class="hidden"><?php include('../assets/itsolution24/img/iconmin/icon.svg');?></div>
-<div class="wrapper">
-<?php include '../_inc/template/partials/top.php'; ?>
+
+<body class="hold-transition sidebar-mini<?php echo $body_class; ?><?php echo isRTL() ? ' rtl' : null; ?>">
+    <div class="hidden"><?php include('../assets/itsolution24/img/iconmin/icon.svg'); ?></div>
+    <div class="wrapper">
+        <?php include '../_inc/template/partials/top.php'; ?>

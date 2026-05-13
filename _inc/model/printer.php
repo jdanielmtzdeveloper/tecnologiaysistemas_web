@@ -36,44 +36,34 @@ class ModelPrinter extends Model
     	return $printer_id;
 	}
 
-	public function updatePath($printer_id, $path, $store_id = null) 
+	public function updatePath($printer_id, $path, $store_id = null)
 	{
-		$store_id = $store_id ? $store_id : store_id();
-
-		$statement = $this->db->prepare("UPDATE `printer_to_store` SET `path` = ? WHERE `store_id` = ? AND `pprinter_id` = ?");
-		$statement->execute(array($path, $store_id, $printer_id));
+		$statement = $this->db->prepare("UPDATE `printer_to_store` SET `path` = ? WHERE `pprinter_id` = ?");
+		$statement->execute(array($path, $printer_id));
 	}
 
-	public function updateIpAddress($printer_id, $ip_address, $store_id = null) 
+	public function updateIpAddress($printer_id, $ip_address, $store_id = null)
 	{
-		$store_id = $store_id ? $store_id : store_id();
-
-		$statement = $this->db->prepare("UPDATE `printer_to_store` SET `ip_address` = ? WHERE `store_id` = ? AND `pprinter_id` = ?");
-		$statement->execute(array($ip_address, $store_id, $printer_id));
+		$statement = $this->db->prepare("UPDATE `printer_to_store` SET `ip_address` = ? WHERE `pprinter_id` = ?");
+		$statement->execute(array($ip_address, $printer_id));
 	}
 
-	public function updatePort($printer_id, $port, $store_id = null) 
+	public function updatePort($printer_id, $port, $store_id = null)
 	{
-		$store_id = $store_id ? $store_id : store_id();
-
-		$statement = $this->db->prepare("UPDATE `printer_to_store` SET `port` = ? WHERE `store_id` = ? AND `pprinter_id` = ?");
-		$statement->execute(array($port, $store_id, $printer_id));
+		$statement = $this->db->prepare("UPDATE `printer_to_store` SET `port` = ? WHERE `pprinter_id` = ?");
+		$statement->execute(array($port, $printer_id));
 	}
 
-	public function updateStatus($printer_id, $status, $store_id = null) 
+	public function updateStatus($printer_id, $status, $store_id = null)
 	{
-		$store_id = $store_id ? $store_id : store_id();
-
-		$statement = $this->db->prepare("UPDATE `printer_to_store` SET `status` = ? WHERE `store_id` = ? AND `pprinter_id` = ?");
-		$statement->execute(array($status, $store_id, $printer_id));
+		$statement = $this->db->prepare("UPDATE `printer_to_store` SET `status` = ? WHERE `pprinter_id` = ?");
+		$statement->execute(array($status, $printer_id));
 	}
 
-	public function updateSortOrder($printer_id, $sort_order, $store_id = null) 
+	public function updateSortOrder($printer_id, $sort_order, $store_id = null)
 	{
-		$store_id = $store_id ? $store_id : store_id();
-
-		$statement = $this->db->prepare("UPDATE `printer_to_store` SET `sort_order` = ? WHERE `store_id` = ? AND `pprinter_id` = ?");
-		$statement->execute(array($sort_order, $store_id, $printer_id));
+		$statement = $this->db->prepare("UPDATE `printer_to_store` SET `sort_order` = ? WHERE `pprinter_id` = ?");
+		$statement->execute(array($sort_order, $printer_id));
 	}
 
 	public function editPrinter($printer_id, $data) 

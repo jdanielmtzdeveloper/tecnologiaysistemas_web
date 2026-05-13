@@ -58,8 +58,8 @@ function validate_request_data($request)
     throw new Exception(trans('error_zip_code'));
   }
 
-    // Validate store cashiar name
-  if (!validateInteger($request->post['cashier_id'])) {
+    // Validate store cashiar name (only required when creating a new store)
+  if (($request->post['action_type'] ?? '') == 'CREATE' && !validateInteger($request->post['cashier_id'] ?? null)) {
     throw new Exception(trans('error_cashier_name'));
   }
 

@@ -29,7 +29,6 @@ class Escpos
     public function __construct() {}
 
     function load($printer) {
-        dd($printer);
         $this->char_per_line = $printer->char_per_line;
         if ($printer->type == 'network') {
             try {
@@ -39,9 +38,19 @@ class Escpos
                 echo "Couldn't print to this printer: " . $e -> getMessage() . "\n";
             }
         } elseif ($printer->type == 'linux') {
-            $connector = new FilePrintConnector($printer->path);
+            try {
+                $connector = new FilePrintConnector($printer->path);
+                $this->printer = new Printer($connector);
+            } catch (Exception $e) {
+                throw new Exception("Error conectando impresora Linux: " . $e->getMessage());
+            }
         } else {
-            $connector = new WindowsPrintConnector($printer->path);
+            try {
+                $connector = new WindowsPrintConnector($printer->path);
+                $this->printer = new Printer($connector);
+            } catch (Exception $e) {
+                throw new Exception("Error conectando impresora Windows (path: '{$printer->path}'): " . $e->getMessage());
+            }
         }
     }
 

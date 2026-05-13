@@ -24,8 +24,8 @@ class ModelStore extends Model
 
 	public function editStore($store_id, $data) 
 	{
-    	$statement = $this->db->prepare("UPDATE `stores` SET `name` = ?, `code_name` = ?, `mobile` = ?, `email` = ?, `country` = ?, `vat_reg_no` = ?,  `zip_code` = ?, `cashier_id` = ?, `address` = ?, `sound_effect` = ?, `status` = ?, `sort_order` = ?, `receipt_printer` = ?, `remote_printing` = ?, `auto_print` = ?, `deposit_account_id` = ? WHERE `store_id` = ? ");
-    	$statement->execute(array($data['name'], $data['code_name'], $data['mobile'], $data['email'], $data['country'], $data['vat_reg_no'], $data['zip_code'], $data['cashier_id'], $data['address'], $data['sound_effect'], $data['status'], $data['sort_order'], $data['receipt_printer'], $data['remote_printing'], $data['auto_print'], $data['deposit_account_id'], $store_id));
+    	$statement = $this->db->prepare("UPDATE `stores` SET `name` = ?, `code_name` = ?, `mobile` = ?, `email` = ?, `country` = ?, `vat_reg_no` = ?,  `zip_code` = ?, `cashier_id` = COALESCE(?, `cashier_id`), `address` = ?, `sound_effect` = ?, `status` = ?, `sort_order` = ?, `receipt_printer` = ?, `remote_printing` = ?, `auto_print` = ?, `deposit_account_id` = ? WHERE `store_id` = ? ");
+    	$statement->execute(array($data['name'], $data['code_name'], $data['mobile'], $data['email'], $data['country'], $data['vat_reg_no'], $data['zip_code'], $data['cashier_id'] ?? null, $data['address'], $data['sound_effect'], $data['status'], $data['sort_order'], $data['receipt_printer'], $data['remote_printing'], $data['auto_print'], $data['deposit_account_id'], $store_id));
 
 
     	$statement = $this->db->prepare("UPDATE `customers` SET `customer_address` = ?,`customer_city` = ?, `customer_state` = ?, `customer_country` = ?");

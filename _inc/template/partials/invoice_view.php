@@ -20,12 +20,34 @@ echo $parser->parse($template, $data);
     <tbody>
       <tr class="no-print">
         <td colspan="2">
-          <button onClick="window.printContent('invoice', {title:'<?php echo $invoice_id;?>',scrrenSize:'halfScreen'});" class="btn btn-info btn-block">
-            <span class="fa fa-fw fa-print"></span> 
+          <button onclick="printToTicketPrinter('<?php echo htmlspecialchars($invoice_id, ENT_QUOTES); ?>')" class="btn btn-info btn-block" id="btn-ticket-print">
+            <span class="fa fa-fw fa-print"></span>
             <?php echo trans('button_print'); ?>
           </button>
         </td>
       </tr>
+      <script>
+      function printToTicketPrinter(invoiceId) {
+        var btn = document.getElementById('btn-ticket-print');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="fa fa-fw fa-spinner fa-spin"></span> Imprimiendo...';
+        $.get(baseUrl + '/_inc/print_invoice.php', { invoice_id: invoiceId })
+          .done(function() {
+            if (window.toastr) toastr.success('Impreso correctamente', '');
+          })
+          .fail(function(xhr) {
+            var msg = (xhr.responseJSON && xhr.responseJSON.errorMsg)
+              ? xhr.responseJSON.errorMsg
+              : (xhr.responseText ? xhr.responseText.substring(0, 300) : 'Error al imprimir');
+            if (window.toastr) toastr.error(msg, 'Error');
+            else alert(msg);
+          })
+          .always(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="fa fa-fw fa-print"></span> <?php echo trans('button_print'); ?>';
+          });
+      }
+      </script>
       <?php if ((user_group_id() == 1 || has_permission('access', 'sms_sell_invoice')) && get_preference('sms_alert')):?>
         <tr class="no-print">
           <td colspan="2">

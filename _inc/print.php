@@ -26,6 +26,5 @@ $escpos = new Escpos();
 
 // PRINT DATA
 $data = json_decode($_GET['data']);
-dd($data);
 $escpos->load($data->printer);
 $escpos->print_receipt($data);

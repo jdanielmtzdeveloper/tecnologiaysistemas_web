@@ -7,6 +7,7 @@ storage/qrcode.png
 error_log
 access.log
 error.log
+.htaccess
 
 #----------------------------------------------------------------------------
 # MISC
