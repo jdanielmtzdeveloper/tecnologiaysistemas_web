@@ -623,6 +623,7 @@ if ($order_printer_ids) {
 
 	<?php endif; ?>
 
+	<script src="../assets/qz-tray/qz-tray.js" type="text/javascript"></script>
 	<script src="../assets/itsolution24/angular/modals/AddInvoiceNoteModal.js" type="text/javascript"></script>
 	<script src="../assets/itsolution24/angular/modals/AddCustomerMobileNumberModal.js" type="text/javascript"></script>
 	<script src="../assets/itsolution24/angular/modals/HoldingOrderModal.js" type="text/javascript"></script>

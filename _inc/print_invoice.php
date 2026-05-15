@@ -124,6 +124,31 @@ $data->logo       = '';   // skip logo: FCPATH no disponible en este contexto
 $data->text       = $text;
 $data->cash_drawer = '';
 
+// QZ Tray mode: return raw ESC/POS bytes as base64 instead of printing directly
+if (isset($_GET['mode']) && $_GET['mode'] === 'data') {
+    try {
+        $escpos = new Escpos();
+        $bytes  = $escpos->get_receipt_bytes($data);
+
+        $parts     = array_values(array_filter(explode('/', str_replace('\\', '/', $printer->path))));
+        $shareName = end($parts);
+
+        ob_end_clean();
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(array(
+            'success'      => true,
+            'printer_name' => $shareName,
+            'data'         => base64_encode($bytes),
+        ));
+    } catch (Exception $e) {
+        ob_end_clean();
+        header('HTTP/1.1 422 Unprocessable Entity');
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(array('errorMsg' => $e->getMessage()));
+    }
+    exit();
+}
+
 try {
     $escpos = new Escpos();
     $escpos->load($data->printer);

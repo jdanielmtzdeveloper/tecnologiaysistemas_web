@@ -102,6 +102,17 @@ class Escpos
 
     }
 
+    public function get_receipt_bytes($data) {
+        $tmpfile = tempnam(sys_get_temp_dir(), 'pos_rcpt_');
+        $connector = new FilePrintConnector($tmpfile);
+        $this->printer = new Printer($connector);
+        $this->char_per_line = $data->printer->char_per_line;
+        $this->print_receipt($data);
+        $bytes = file_get_contents($tmpfile);
+        @unlink($tmpfile);
+        return $bytes;
+    }
+
     function open_drawer() {
         $this->printer->pulse();
         $this->printer->close();

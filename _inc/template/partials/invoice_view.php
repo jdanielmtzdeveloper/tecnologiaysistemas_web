@@ -29,11 +29,55 @@ echo $parser->parse($template, $data);
       <script>
       function printToTicketPrinter(invoiceId) {
         var btn = document.getElementById('btn-ticket-print');
+        var originalLabel = '<span class="fa fa-fw fa-print"></span> <?php echo trans('button_print'); ?>';
         btn.disabled = true;
         btn.innerHTML = '<span class="fa fa-fw fa-spinner fa-spin"></span> Imprimiendo...';
-        $.get(baseUrl + '/_inc/print_invoice.php', { invoice_id: invoiceId })
-          .done(function() {
-            if (window.toastr) toastr.success('Impreso correctamente', '');
+
+        function resetBtn() {
+          btn.disabled = false;
+          btn.innerHTML = originalLabel;
+        }
+
+        if (typeof qz === 'undefined') {
+          if (window.toastr) toastr.error('QZ Tray no está cargado. Verifica que qz-tray.js esté instalado.', 'Error');
+          resetBtn();
+          return;
+        }
+
+        // Unsigned mode — for internal/private POS use
+        qz.security.setCertificatePromise(function(resolve) { resolve(); });
+        qz.security.setSignaturePromise(function() { return function(resolve) { resolve(); }; });
+
+        $.get(baseUrl + '/_inc/print_invoice.php', { invoice_id: invoiceId, mode: 'data' })
+          .done(function(response) {
+            if (!response.success || !response.data) {
+              if (window.toastr) toastr.error('No se recibieron datos de impresión.', 'Error');
+              resetBtn();
+              return;
+            }
+
+            var printData = [{ type: 'raw', format: 'base64', data: response.data }];
+
+            qz.websocket.connect()
+              .then(function() { return qz.printers.find(response.printer_name); })
+              .then(function(qzPrinter) {
+                return qz.print(qz.configs.create(qzPrinter), printData);
+              })
+              .then(function() {
+                if (window.toastr) toastr.success('Impreso correctamente', '');
+                resetBtn();
+              })
+              .catch(function(err) {
+                var msg = (err && err.message) ? err.message : String(err);
+                if (msg.indexOf('Unable to establish connection') !== -1 || msg.indexOf('connect') !== -1) {
+                  msg = 'QZ Tray no está ejecutándose. Ábrelo en tu PC e intenta de nuevo.';
+                }
+                if (window.toastr) toastr.error(msg, 'Error de impresión');
+                resetBtn();
+              })
+              .finally(function() {
+                if (qz.websocket.isActive()) qz.websocket.disconnect();
+              });
           })
           .fail(function(xhr) {
             var msg = (xhr.responseJSON && xhr.responseJSON.errorMsg)
@@ -41,10 +85,7 @@ echo $parser->parse($template, $data);
               : (xhr.responseText ? xhr.responseText.substring(0, 300) : 'Error al imprimir');
             if (window.toastr) toastr.error(msg, 'Error');
             else alert(msg);
-          })
-          .always(function() {
-            btn.disabled = false;
-            btn.innerHTML = '<span class="fa fa-fw fa-print"></span> <?php echo trans('button_print'); ?>';
+            resetBtn();
           });
       }
       </script>
