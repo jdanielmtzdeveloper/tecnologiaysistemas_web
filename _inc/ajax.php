@@ -286,8 +286,81 @@ if($request->server['REQUEST_METHOD'] == 'GET' AND $request->get['type'] == 'STO
 		echo json_encode(array('msg' => trans('text_success'), 'products' => $products));
 		exit();
 
-	} catch (Exception $e) { 
+	} catch (Exception $e) {
 
+		header('HTTP/1.1 422 Unprocessable Entity');
+		header('Content-Type: application/json; charset=UTF-8');
+		echo json_encode(array('errorMsg' => $e->getMessage()));
+		exit();
+	}
+}
+
+// Get cashbook summary for Corte de Caja modal
+if ($request->server['REQUEST_METHOD'] == 'GET' AND $request->get['type'] == 'GETCASHBOOKSUMMARY') {
+	try {
+		$from = date('Y-m-d');
+		$opening_balance   = get_opening_balance($from);
+		$today_income      = get_total_income($from, null);
+		$tarjeta_credito   = get_pagos_tarjeta_credito($from, null);
+		$tarjeta_debito    = get_pagos_tarjeta_debito($from, null);
+		$ingreso_efectivo  = max(0, $today_income - $tarjeta_credito - $tarjeta_debito);
+		$total_expense     = get_total_expense($from, null);
+		$total_income      = $opening_balance + $today_income;
+		$saldo_final       = $total_income - $total_expense;
+
+		header('Content-Type: application/json');
+		echo json_encode(array(
+			'opening_balance'  => number_format($opening_balance, 2),
+			'today_income'     => number_format($today_income, 2),
+			'ingreso_efectivo' => number_format($ingreso_efectivo, 2),
+			'tarjeta_credito'  => number_format($tarjeta_credito, 2),
+			'tarjeta_debito'   => number_format($tarjeta_debito, 2),
+			'total_expense'    => number_format($total_expense, 2),
+			'saldo_final'      => number_format($saldo_final, 2),
+		));
+		exit();
+	} catch (Exception $e) {
+		header('HTTP/1.1 422 Unprocessable Entity');
+		header('Content-Type: application/json; charset=UTF-8');
+		echo json_encode(array('errorMsg' => $e->getMessage()));
+		exit();
+	}
+}
+
+// Corte de Caja Manual
+if ($request->server['REQUEST_METHOD'] == 'POST' AND $request->get['type'] == 'CORTEDECAJA') {
+	try {
+		$from = date('Y-m-d');
+		$day   = date('d', strtotime($from));
+		$month = date('m', strtotime($from));
+		$year  = date('Y', strtotime($from));
+		$where_query  = " DAY(`pos_register`.`created_at`) = $day";
+		$where_query .= " AND MONTH(`pos_register`.`created_at`) = $month";
+		$where_query .= " AND YEAR(`pos_register`.`created_at`) = $year";
+
+		$saldo_final      = str_replace(',', '', $request->post['saldo_final']);
+		$efectivo_contado = str_replace(',', '', $request->post['efectivo_contado']);
+		$saldo_final      = is_numeric($saldo_final) ? (float)$saldo_final : 0;
+		// Si no se ingresó efectivo contado (o es 0), usar el saldo calculado del sistema
+		$efectivo_contado = (is_numeric($efectivo_contado) && (float)$efectivo_contado > 0)
+			? (float)$efectivo_contado
+			: $saldo_final;
+
+		$statement = db()->prepare("SELECT `id` FROM `pos_register` WHERE $where_query AND `store_id` = ?");
+		$statement->execute(array(store_id()));
+		$row = $statement->fetch(PDO::FETCH_ASSOC);
+		if (!$row) {
+			$statement = db()->prepare("INSERT INTO `pos_register` SET `store_id` = ?, `created_at` = ?");
+			$statement->execute(array(store_id(), date_time()));
+		}
+
+		$statement = db()->prepare("UPDATE `pos_register` SET `closing_balance` = ? WHERE $where_query AND `store_id` = ?");
+		$statement->execute(array($efectivo_contado, store_id()));
+
+		header('Content-Type: application/json');
+		echo json_encode(array('msg' => 'Corte de caja registrado correctamente.'));
+		exit();
+	} catch (Exception $e) {
 		header('HTTP/1.1 422 Unprocessable Entity');
 		header('Content-Type: application/json; charset=UTF-8');
 		echo json_encode(array('errorMsg' => $e->getMessage()));

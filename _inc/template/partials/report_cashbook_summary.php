@@ -24,30 +24,41 @@
           ?>
         </td>
       </tr>
+      <?php
+      $total_tarjeta_credito = get_pagos_tarjeta_credito($from, to());
+      $total_tarjeta_debito  = get_pagos_tarjeta_debito($from, to());
+      $ingreso_efectivo = max(0, $today_income - $total_tarjeta_credito - $total_tarjeta_debito);
+      ?>
+      <tr>
+        <td class="w-50 text-right" style="background:#d9edf7;padding-left:30px;">
+          &nbsp;&nbsp;<i class="fa fa-money"></i> INGRESO EFECTIVO
+        </td>
+        <td class="w-50 text-right" style="background:#d9edf7;">
+          <?php echo currency_format($ingreso_efectivo); ?>
+        </td>
+      </tr>
+      <tr class="bg-green">
+        <td class="w-50 text-right" style="padding-left:30px;">
+          &nbsp;&nbsp;<i class="fa fa-credit-card"></i> PAGOS CON TARJETA CR&Eacute;DITO
+        </td>
+        <td class="w-50 text-right">
+          <?php echo currency_format($total_tarjeta_credito); ?>
+        </td>
+      </tr>
+      <tr class="bg-green">
+        <td class="w-50 text-right" style="padding-left:30px;">
+          &nbsp;&nbsp;<i class="fa fa-credit-card-alt"></i> PAGOS CON TARJETA D&Eacute;BITO
+        </td>
+        <td class="w-50 text-right">
+          <?php echo currency_format($total_tarjeta_debito); ?>
+        </td>
+      </tr>
       <tr class="bg-blue">
         <td class="w-50 text-right"><?php echo trans('label_total_income'); ?></td>
         <td class="w-50 text-right">
           <?php
           $total_income = $opening_balance + $today_income;
           echo currency_format($total_income);
-          ?>
-        </td>
-      </tr>
-      <tr class="bg-green">
-        <td class="w-50 text-right">PAGOS CON TARJETA CREDITO</td>
-        <td class="w-50 text-right">
-          <?php
-          $total_tarjeta = get_pagos_tarjeta_credito($from, to());
-          echo currency_format($total_tarjeta);
-          ?>
-        </td>
-      </tr>
-      <tr class="bg-green">
-        <td class="w-50 text-right">PAGOS CON TARJETA DEBITO</td>
-        <td class="w-50 text-right">
-          <?php
-          $total_tarjeta = get_pagos_tarjeta_debito($from, to());
-          echo currency_format($total_tarjeta);
           ?>
         </td>
       </tr>

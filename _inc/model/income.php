@@ -151,40 +151,36 @@ class ModelIncome extends Model
 	public function getTotalTarjetaCredito($from, $to, $store_id = null)
 	{
 		$store_id = $store_id ? $store_id : store_id();
-
-		// Income
-		$where_query = "`bank_transaction_price`.`store_id` = '$store_id' AND `transaction_type` IN ('deposit') AND `income_sources`.`type` = 'credit' AND `payments`.`pmethod_id` = 5";
+		$where_query = "`bank_transaction_price`.`store_id` = '$store_id' AND `transaction_type` IN ('deposit') AND `income_sources`.`type` = 'credit'
+			AND `payments`.`pmethod_id` IN (SELECT `pmethod_id` FROM `pmethods` WHERE LOWER(`code_name`) LIKE '%credito%')";
 		if ($from) {
 			$where_query .= date_range_accounting_filter($from, $to);
 		}
-		$statement = $this->db->prepare("SELECT SUM(`bank_transaction_price`.`amount`) as `total` FROM `bank_transaction_info` 
+		$statement = $this->db->prepare("SELECT SUM(`bank_transaction_price`.`amount`) as `total` FROM `bank_transaction_info`
 			LEFT JOIN `income_sources` ON (`bank_transaction_info`.`source_id` = `income_sources`.`source_id`)
 			LEFT JOIN `bank_transaction_price` ON (`bank_transaction_info`.`info_id` = `bank_transaction_price`.`info_id`)
 			LEFT JOIN `payments` ON `payments`.`invoice_id` = `bank_transaction_info`.`invoice_id`
-			WHERE  {$where_query}");
+			WHERE {$where_query}");
 		$statement->execute(array());
 		$row = $statement->fetch(PDO::FETCH_ASSOC);
-		$income = isset($row['total']) ? $row['total'] : 0;
-		return $income;
+		return isset($row['total']) ? $row['total'] : 0;
 	}
 
 	public function getTotalTarjetaDebito($from, $to, $store_id = null)
 	{
 		$store_id = $store_id ? $store_id : store_id();
-
-		// Income
-		$where_query = "`bank_transaction_price`.`store_id` = '$store_id' AND `transaction_type` IN ('deposit') AND `income_sources`.`type` = 'credit' AND `payments`.`pmethod_id` = 6";
+		$where_query = "`bank_transaction_price`.`store_id` = '$store_id' AND `transaction_type` IN ('deposit') AND `income_sources`.`type` = 'credit'
+			AND `payments`.`pmethod_id` IN (SELECT `pmethod_id` FROM `pmethods` WHERE LOWER(`code_name`) LIKE '%debito%')";
 		if ($from) {
 			$where_query .= date_range_accounting_filter($from, $to);
 		}
-		$statement = $this->db->prepare("SELECT SUM(`bank_transaction_price`.`amount`) as `total` FROM `bank_transaction_info` 
+		$statement = $this->db->prepare("SELECT SUM(`bank_transaction_price`.`amount`) as `total` FROM `bank_transaction_info`
 			LEFT JOIN `income_sources` ON (`bank_transaction_info`.`source_id` = `income_sources`.`source_id`)
 			LEFT JOIN `bank_transaction_price` ON (`bank_transaction_info`.`info_id` = `bank_transaction_price`.`info_id`)
 			LEFT JOIN `payments` ON `payments`.`invoice_id` = `bank_transaction_info`.`invoice_id`
-			WHERE  {$where_query}");
+			WHERE {$where_query}");
 		$statement->execute(array());
 		$row = $statement->fetch(PDO::FETCH_ASSOC);
-		$income = isset($row['total']) ? $row['total'] : 0;
-		return $income;
+		return isset($row['total']) ? $row['total'] : 0;
 	}
 }
