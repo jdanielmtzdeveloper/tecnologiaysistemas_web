@@ -295,16 +295,79 @@ if($request->server['REQUEST_METHOD'] == 'GET' AND $request->get['type'] == 'STO
 	}
 }
 
+// Resumen del libro de pagos en HTML (carga dinámica) para cualquier fecha
+if ($request->server['REQUEST_METHOD'] == 'GET' AND $request->get['type'] == 'GETCASHBOOKSUMMARYHTML') {
+	try {
+		// Soporta día único (?from=X) y rango (?from=X&to=Y)
+		$f_from = isset($request->get['from']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $request->get['from'])
+			? $request->get['from'] : date('Y-m-d');
+		$f_to   = isset($request->get['to'])   && preg_match('/^\d{4}-\d{2}-\d{2}$/', $request->get['to'])
+			? $request->get['to']   : $f_from;
+		if ($f_to < $f_from) { $f_to = $f_from; }
+		$is_range = ($f_from !== $f_to);
+
+		// date_range_accounting_filter() ya añade 23:59:59 internamente cuando from != to.
+		// Para rango: pasar $f_to como fecha simple → activa filtro BETWEEN correcto.
+		// Para día único: $q_to = $f_from → from == to → activa filtro DAY/MONTH/YEAR.
+		$q_to = $is_range ? $f_to : $f_from;
+
+		$opening_balance  = get_opening_balance($f_from);  // saldo inicial del primer día
+		$today_income     = get_total_income($f_from, $q_to);
+		$tarjeta_credito  = get_pagos_tarjeta_credito($f_from, $q_to);
+		$tarjeta_debito   = get_pagos_tarjeta_debito($f_from, $q_to);
+		$ingreso_efectivo = max(0, $today_income - $tarjeta_credito - $tarjeta_debito);
+		$total_expense    = get_total_expense($f_from, $q_to);
+		$total_income     = (float)$opening_balance + (float)$today_income;
+		$cash_in_hand     = $total_income - $total_expense;
+
+		$fmt = function($n) { return number_format((float)$n, 2); };
+		$lbl_income  = $is_range ? 'INGRESO TOTAL DEL PERÍODO' : trans('label_today_income');
+		$lbl_expense = $is_range ? 'GASTOS DEL PERÍODO'        : trans('label_today_expense').' (-)';
+		$lbl_closing = $is_range ? 'SALDO NETO DEL PERÍODO'    : trans('label_today_closing_balance');
+
+		$html  = '<div class="table-responsive">';
+		$html .= '<table class="table table-bordered table-striped mb-0"><tbody>';
+		$html .= '<tr><td class="w-50 bg-gray text-right">'.trans('label_opening_balance').' <small>('.$f_from.')</small></td>';
+		$html .= '<td class="w-50 bg-gray text-right">$'.$fmt($opening_balance).'</td></tr>';
+		$html .= '<tr><td class="w-50 bg-gray text-right">'.$lbl_income.'</td>';
+		$html .= '<td class="w-50 bg-gray text-right">$'.$fmt($today_income).'</td></tr>';
+		$html .= '<tr><td class="w-50 text-right" style="background:#d9edf7;padding-left:30px;">&nbsp;&nbsp;<i class="fa fa-money"></i> INGRESO EFECTIVO</td>';
+		$html .= '<td class="w-50 text-right" style="background:#d9edf7;">$'.$fmt($ingreso_efectivo).'</td></tr>';
+		$html .= '<tr class="bg-green"><td class="w-50 text-right" style="padding-left:30px;">&nbsp;&nbsp;<i class="fa fa-credit-card"></i> PAGOS CON TARJETA CR&Eacute;DITO</td>';
+		$html .= '<td class="w-50 text-right">$'.$fmt($tarjeta_credito).'</td></tr>';
+		$html .= '<tr class="bg-green"><td class="w-50 text-right" style="padding-left:30px;">&nbsp;&nbsp;<i class="fa fa-credit-card-alt"></i> PAGOS CON TARJETA D&Eacute;BITO</td>';
+		$html .= '<td class="w-50 text-right">$'.$fmt($tarjeta_debito).'</td></tr>';
+		$html .= '<tr class="bg-blue"><td class="w-50 text-right">'.trans('label_total_income').'</td>';
+		$html .= '<td class="w-50 text-right">$'.$fmt($total_income).'</td></tr>';
+		$html .= '<tr class="bg-red"><td class="w-50 text-right">'.$lbl_expense.'</td>';
+		$html .= '<td class="w-50 text-right">$'.$fmt($total_expense).'</td></tr>';
+		$html .= '<tr class="bg-blue"><td class="w-50 text-right">'.trans('label_balance').' / '.trans('label_cash_in_hand').'</td>';
+		$html .= '<td class="w-50 text-right">$'.$fmt($cash_in_hand).'</td></tr>';
+		$html .= '<tr class="bg-yellow"><td class="w-50 text-right"><h4><b>'.$lbl_closing.'</b></h4></td>';
+		$html .= '<td class="w-50 text-right"><h4><b>$'.$fmt($cash_in_hand).'</b></h4></td></tr>';
+		$html .= '</tbody></table></div>';
+
+		header('Content-Type: application/json');
+		echo json_encode(array('html' => $html));
+		exit();
+	} catch (Exception $e) {
+		header('HTTP/1.1 422 Unprocessable Entity');
+		header('Content-Type: application/json; charset=UTF-8');
+		echo json_encode(array('errorMsg' => $e->getMessage()));
+		exit();
+	}
+}
+
 // Get cashbook summary for Corte de Caja modal
 if ($request->server['REQUEST_METHOD'] == 'GET' AND $request->get['type'] == 'GETCASHBOOKSUMMARY') {
 	try {
 		$from = date('Y-m-d');
 		$opening_balance   = get_opening_balance($from);
-		$today_income      = get_total_income($from, null);
-		$tarjeta_credito   = get_pagos_tarjeta_credito($from, null);
-		$tarjeta_debito    = get_pagos_tarjeta_debito($from, null);
+		$today_income      = get_total_income($from, $from);
+		$tarjeta_credito   = get_pagos_tarjeta_credito($from, $from);
+		$tarjeta_debito    = get_pagos_tarjeta_debito($from, $from);
 		$ingreso_efectivo  = max(0, $today_income - $tarjeta_credito - $tarjeta_debito);
-		$total_expense     = get_total_expense($from, null);
+		$total_expense     = get_total_expense($from, $from);
 		$total_income      = $opening_balance + $today_income;
 		$saldo_final       = $total_income - $total_expense;
 
@@ -327,7 +390,7 @@ if ($request->server['REQUEST_METHOD'] == 'GET' AND $request->get['type'] == 'GE
 	}
 }
 
-// Corte de Caja Manual
+// Corte de Caja Manual — registra un nuevo corte (permite múltiples por día)
 if ($request->server['REQUEST_METHOD'] == 'POST' AND $request->get['type'] == 'CORTEDECAJA') {
 	try {
 		$from = date('Y-m-d');
@@ -340,12 +403,26 @@ if ($request->server['REQUEST_METHOD'] == 'POST' AND $request->get['type'] == 'C
 
 		$saldo_final      = str_replace(',', '', $request->post['saldo_final']);
 		$efectivo_contado = str_replace(',', '', $request->post['efectivo_contado']);
+		$notas            = isset($request->post['notas']) ? trim($request->post['notas']) : '';
 		$saldo_final      = is_numeric($saldo_final) ? (float)$saldo_final : 0;
-		// Si no se ingresó efectivo contado (o es 0), usar el saldo calculado del sistema
+
+		// Obtener datos reales del día (fuente de verdad: servidor)
+		// Se pasa $from como $to para forzar filtro de día exacto (no rango multi-día)
+		$opening_balance   = get_opening_balance($from);
+		$today_income      = get_total_income($from, $from);
+		$tarjeta_credito   = get_pagos_tarjeta_credito($from, $from);
+		$tarjeta_debito    = get_pagos_tarjeta_debito($from, $from);
+		$ingreso_efectivo  = max(0, $today_income - $tarjeta_credito - $tarjeta_debito);
+		$total_expense     = get_total_expense($from, $from);
+
+		// Si no se ingresó efectivo contado, asumir que cuadra con el efectivo del día
 		$efectivo_contado = (is_numeric($efectivo_contado) && (float)$efectivo_contado > 0)
 			? (float)$efectivo_contado
-			: $saldo_final;
+			: (float)$ingreso_efectivo;
+		// Diferencia: efectivo físico contado vs ingreso en efectivo del sistema
+		$diferencia = $efectivo_contado - (float)$ingreso_efectivo;
 
+		// Asegurar que exista registro en pos_register
 		$statement = db()->prepare("SELECT `id` FROM `pos_register` WHERE $where_query AND `store_id` = ?");
 		$statement->execute(array(store_id()));
 		$row = $statement->fetch(PDO::FETCH_ASSOC);
@@ -353,12 +430,105 @@ if ($request->server['REQUEST_METHOD'] == 'POST' AND $request->get['type'] == 'C
 			$statement = db()->prepare("INSERT INTO `pos_register` SET `store_id` = ?, `created_at` = ?");
 			$statement->execute(array(store_id(), date_time()));
 		}
-
+		// Actualizar closing_balance en pos_register (último corte del día)
 		$statement = db()->prepare("UPDATE `pos_register` SET `closing_balance` = ? WHERE $where_query AND `store_id` = ?");
 		$statement->execute(array($efectivo_contado, store_id()));
 
+		// Insertar nuevo corte en la tabla de historial
+		$stmt = db()->prepare("INSERT INTO `corte_caja`
+			(`store_id`, `fecha`, `hora_corte`, `opening_balance`, `today_income`,
+			 `ingreso_efectivo`, `tarjeta_credito`, `tarjeta_debito`, `total_expense`,
+			 `saldo_sistema`, `efectivo_contado`, `diferencia`, `notas`, `user_id`, `created_at`)
+			VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+		$stmt->execute(array(
+			store_id(),
+			$from,
+			$opening_balance,
+			$today_income,
+			$ingreso_efectivo,
+			$tarjeta_credito,
+			$tarjeta_debito,
+			$total_expense,
+			$saldo_final,
+			$efectivo_contado,
+			$diferencia,
+			$notas,
+			user_id()
+		));
+		$nuevo_id = db()->lastInsertId();
+
 		header('Content-Type: application/json');
-		echo json_encode(array('msg' => 'Corte de caja registrado correctamente.'));
+		echo json_encode(array(
+			'msg'  => 'Corte de caja registrado correctamente.',
+			'id'   => $nuevo_id,
+			'hora' => date('H:i:s')
+		));
+		exit();
+	} catch (Exception $e) {
+		header('HTTP/1.1 422 Unprocessable Entity');
+		header('Content-Type: application/json; charset=UTF-8');
+		echo json_encode(array('errorMsg' => $e->getMessage()));
+		exit();
+	}
+}
+
+// Obtener lista de cortes de caja de una fecha
+if ($request->server['REQUEST_METHOD'] == 'GET' AND $request->get['type'] == 'GETCORTES') {
+	try {
+		// Soporta día único (?from=X) y rango (?from=X&to=Y)
+		// También acepta el parámetro legacy ?fecha=X para compatibilidad
+		$g_from = isset($request->get['from'])  && preg_match('/^\d{4}-\d{2}-\d{2}$/', $request->get['from'])
+			? $request->get['from']
+			: (isset($request->get['fecha']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $request->get['fecha'])
+				? $request->get['fecha']
+				: date('Y-m-d'));
+		$g_to   = isset($request->get['to'])    && preg_match('/^\d{4}-\d{2}-\d{2}$/', $request->get['to'])
+			? $request->get['to']
+			: $g_from;
+		if ($g_to < $g_from) { $g_to = $g_from; }
+
+		$stmt = db()->prepare("
+			SELECT c.*, u.`username` AS `user_name`
+			FROM `corte_caja` c
+			LEFT JOIN `users` u ON u.`id` = c.`user_id`
+			WHERE c.`store_id` = ? AND c.`fecha` BETWEEN ? AND ?
+			ORDER BY c.`fecha` ASC, c.`hora_corte` ASC
+		");
+		$stmt->execute(array(store_id(), $g_from, $g_to));
+		$cortes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+		header('Content-Type: application/json');
+		echo json_encode(array('cortes' => $cortes, 'total' => count($cortes)));
+		exit();
+	} catch (Exception $e) {
+		header('HTTP/1.1 422 Unprocessable Entity');
+		header('Content-Type: application/json; charset=UTF-8');
+		echo json_encode(array('errorMsg' => $e->getMessage()));
+		exit();
+	}
+}
+
+// Eliminar un corte de caja (solo admin)
+if ($request->server['REQUEST_METHOD'] == 'POST' AND $request->get['type'] == 'DELETECORTE') {
+	try {
+		if (user_group_id() != 1) {
+			header('HTTP/1.1 403 Forbidden');
+			header('Content-Type: application/json; charset=UTF-8');
+			echo json_encode(array('errorMsg' => 'Sin permisos.'));
+			exit();
+		}
+		$id = isset($request->post['id']) ? (int)$request->post['id'] : 0;
+		if ($id <= 0) {
+			header('HTTP/1.1 422 Unprocessable Entity');
+			header('Content-Type: application/json; charset=UTF-8');
+			echo json_encode(array('errorMsg' => 'ID inválido.'));
+			exit();
+		}
+		$stmt = db()->prepare("DELETE FROM `corte_caja` WHERE `id` = ? AND `store_id` = ?");
+		$stmt->execute(array($id, store_id()));
+
+		header('Content-Type: application/json');
+		echo json_encode(array('msg' => 'Corte eliminado correctamente.'));
 		exit();
 	} catch (Exception $e) {
 		header('HTTP/1.1 422 Unprocessable Entity');
