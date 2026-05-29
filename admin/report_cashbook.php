@@ -43,16 +43,28 @@ $year  = date('Y', strtotime($from));
 $where_query  = " DAY(`pos_register`.`created_at`) = $day";
 $where_query .= " AND MONTH(`pos_register`.`created_at`) = $month";
 $where_query .= " AND YEAR(`pos_register`.`created_at`) = $year";
-$statement = $db->prepare("SELECT `opening_balance` FROM `pos_register` WHERE $where_query AND `store_id` = ?");
-$statement->execute(array(store_id()));
-$row = $statement->fetch(PDO::FETCH_ASSOC);
-$openinig_balance = isset($row['opening_balance']) ? $row['opening_balance'] : 0;
+if (isset($db)) {
+  $statement = $db->prepare("SELECT `opening_balance` FROM `pos_register` WHERE $where_query AND `store_id` = ?");
+  $statement->execute(array(store_id()));
+  $row = $statement->fetch(PDO::FETCH_ASSOC);
+  $openinig_balance = isset($row['opening_balance']) ? $row['opening_balance'] : 0;
+
+  // Verificar si ya hay cortes registrados hoy (para bloquear saldo apertura)
+  $stmt_corte_hoy = $db->prepare("SELECT COUNT(*) AS total FROM corte_caja WHERE store_id = ? AND fecha = ?");
+  $stmt_corte_hoy->execute(array(store_id(), $today));
+  $row_corte_hoy  = $stmt_corte_hoy->fetch(PDO::FETCH_ASSOC);
+  $tiene_corte_hoy = ($row_corte_hoy && (int)$row_corte_hoy['total'] > 0);
+} else {
+  $openinig_balance = 0;
+  $tiene_corte_hoy = false;
+}
 
 // Set Document Title
 $document->setTitle(trans('title_cashbook'));
 $document->setBodyClass('sidebar-collapse');
 
 // Add Script
+$document->addScript('../assets/qz-tray/qz-tray.js');
 $document->addScript('../assets/itsolution24/angular/controllers/ReportIncomeDaywiseController.js');
 $document->addScript('../assets/itsolution24/angular/controllers/ReportExpenseDaywiseController.js');
 
@@ -194,12 +206,22 @@ include ("left_sidebar.php") ;
                   <td class="w-50 bg-info text-right"><?php echo trans('label_opening_balance'); ?></td>
                   <td class="w-50 bg-green text-right">
                     <?php if (strtotime($from) == strtotime(date('Y-m-d'))): ?>
-                      <div class="input-group">
-                        <div class="input-group-addon pointer bg-blue" id="btn-update-balance" title="<?php echo trans('button_save'); ?>">
-                          <i class="fa fa-pencil"></i>
+                      <?php if ($tiene_corte_hoy): ?>
+                        <div class="input-group">
+                          <div class="input-group-addon bg-default" style="cursor:default;" title="Bloqueado: ya existe un corte registrado hoy">
+                            <i class="fa fa-lock text-muted"></i>
+                          </div>
+                          <input style="font-size:22px;font-weight:700;background:#f5f5f5;color:#888;" class="form-control text-center" type="text" value="<?php echo currency_format($openinig_balance);?>" disabled>
                         </div>
-                        <input style="font-size:22px;font-weight:700;" id="opening-balance" class="form-control text-center" type="text" value="<?php echo currency_format($openinig_balance);?>" name="opening_balance" onkeypress="return IsNumeric(event);" ondrop="return false;" onpaste="return false;">
-                      </div>
+                        <small class="text-muted" id="lbl-balance-locked"><i class="fa fa-info-circle"></i> No editable: ya existe un corte registrado.</small>
+                      <?php else: ?>
+                        <div class="input-group" id="balance-editable-group">
+                          <div class="input-group-addon pointer bg-blue" id="btn-update-balance" title="<?php echo trans('button_save'); ?>">
+                            <i class="fa fa-pencil"></i>
+                          </div>
+                          <input style="font-size:22px;font-weight:700;" id="opening-balance" class="form-control text-center" type="text" value="<?php echo currency_format($openinig_balance);?>" name="opening_balance" onkeypress="return IsNumeric(event);" ondrop="return false;" onpaste="return false;">
+                        </div>
+                      <?php endif; ?>
                     <?php else:?>
                       <h4 class="text-center"><b><?php echo currency_format($openinig_balance);?></b></h4>
                     <?php endif;?>
@@ -361,15 +383,22 @@ include ("left_sidebar.php") ;
             </tbody>
             <tfoot id="tfoot-cortes" style="display:none;">
               <tr class="bg-yellow">
-                <th colspan="2" class="text-right">TOTALES</th>
-                <th class="text-right" id="tfoot-apertura">—</th>
-                <th class="text-right" id="tfoot-ingreso">—</th>
-                <th class="text-right" id="tfoot-efectivo">—</th>
-                <th class="text-right" id="tfoot-tarjetas">—</th>
-                <th class="text-right" id="tfoot-gastos">—</th>
-                <th class="text-right" id="tfoot-saldo">—</th>
-                <th class="text-right" id="tfoot-contado">—</th>
-                <th colspan="<?php echo user_group_id() == 1 ? '4' : '3'; ?>"></th>
+                <th id="tfoot-label" colspan="2" class="text-right" style="vertical-align:middle;font-size:11px;">
+                  RESUMEN FINAL<br>
+                  <small style="font-weight:normal;color:#777;">
+                    <span style="color:#31708f;">●</span> al último corte &nbsp;
+                    <span style="color:#3c763d;">∑</span> suma de cortes
+                  </small>
+                </th>
+                <th class="text-right" id="tfoot-apertura" title="Saldo de apertura del período">—</th>
+                <th class="text-right" id="tfoot-ingreso" title="Ingreso acumulado al último corte del día" style="color:#31708f;">—</th>
+                <th class="text-right" id="tfoot-efectivo" title="Efectivo acumulado al último corte del día" style="color:#31708f;">—</th>
+                <th class="text-right" id="tfoot-tarjetas" title="Tarjetas acumuladas al último corte del día" style="color:#31708f;">—</th>
+                <th class="text-right" id="tfoot-gastos" title="Gastos acumulados al último corte del día" style="color:#31708f;">—</th>
+                <th class="text-right" id="tfoot-saldo" title="Saldo sistema al último corte del día" style="color:#31708f;">—</th>
+                <th class="text-right" id="tfoot-contado" title="Suma de todo el efectivo contado en los cortes" style="color:#3c763d;">—</th>
+                <th class="text-center" id="tfoot-diferencia" title="Suma de todas las diferencias de los cortes" style="color:#3c763d;">—</th>
+                <th colspan="<?php echo user_group_id() == 1 ? '3' : '2'; ?>"></th>
               </tr>
             </tfoot>
           </table>
@@ -392,13 +421,19 @@ include ("left_sidebar.php") ;
         <h4 class="modal-title"><i class="fa fa-lock"></i> CORTE DE CAJA &mdash; <span id="corte-hora-actual"></span></h4>
       </div>
       <div class="modal-body">
-        <div class="alert alert-warning">
-          <i class="fa fa-warning"></i> Se registrar&aacute; un nuevo corte parcial. Puede realizar m&aacute;s cortes durante el mismo d&iacute;a.
+        <!-- Alerta: cambia según si hay cortes previos -->
+        <div id="corte-alerta-normal" class="alert alert-warning" style="display:none;">
+          <i class="fa fa-warning"></i> Se registrar&aacute; el primer corte del d&iacute;a.
         </div>
+        <div id="corte-alerta-previo" class="alert alert-info" style="display:none;">
+          <i class="fa fa-info-circle"></i> Ya existe un corte hoy a las <strong id="corte-last-hora">—</strong>.
+          Los valores <span class="label label-warning">desde último corte</span> son los que debes cuadrar ahora.
+        </div>
+
         <div class="row">
           <div class="col-md-7">
             <div class="table-responsive">
-              <table class="table table-bordered table-striped">
+              <table class="table table-bordered table-striped" style="font-size:13px;">
                 <tbody>
                   <tr>
                     <td class="bg-gray text-right" style="width:55%"><strong>SALDO APERTURA</strong></td>
@@ -428,6 +463,17 @@ include ("left_sidebar.php") ;
                     <td class="text-right"><h4><b>SALDO SISTEMA</b></h4></td>
                     <td class="text-right"><h4><b id="corte-saldo-final">—</b></h4></td>
                   </tr>
+
+                  <!-- Fila incremental: visible solo cuando hay cortes previos -->
+                  <tr id="corte-row-inc" style="display:none;background:#fff3cd;border-top:2px solid #e6a817;">
+                    <td class="text-right" style="padding-left:0;">
+                      <span class="label label-warning" style="font-size:11px;"><i class="fa fa-check-circle"></i> Efectivo esperado en caja</span><br>
+                      <small class="text-muted">Saldo Sistema &minus; Tarjetas</small>
+                    </td>
+                    <td class="text-right" style="font-size:1.2em;font-weight:700;color:#856404;">
+                      $<span id="corte-inc-efectivo">—</span>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -442,7 +488,7 @@ include ("left_sidebar.php") ;
               <small class="text-muted">Monto f&iacute;sico contado (opcional).</small>
             </div>
             <div id="corte-diferencia-row" class="well well-sm text-center" style="display:none;">
-              <small class="text-muted">Contado vs Ingreso Efectivo</small><br>
+              <small class="text-muted" id="corte-dif-label">Contado vs Efectivo del día</small><br>
               <strong>Diferencia: </strong>
               <span id="corte-diferencia" style="font-size:1.3em;font-weight:700;"></span>
             </div>
@@ -479,7 +525,7 @@ include ("left_sidebar.php") ;
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Cerrar</button>
         <button type="button" class="btn btn-info" id="btn-imprimir-detalle">
-          <i class="fa fa-print"></i> Imprimir
+          <i class="fa fa-print"></i> Imprimir Ticket
         </button>
       </div>
     </div>
@@ -537,18 +583,38 @@ include ("left_sidebar.php") ;
     $('#tabla-cortes thead tr th.col-fecha, #tabla-cortes tfoot tr th.col-fecha').toggle(isRange);
 
     var html = '';
-    var totIngresos = 0, totEfectivo = 0, totTarjetas = 0, totGastos = 0, totSaldo = 0, totContado = 0;
+
+    // Agrupar cortes por fecha → tomar el último de cada día para columnas acumuladas
+    var byFecha = {};
+    cortes.forEach(function(c) {
+      if (!byFecha[c.fecha]) byFecha[c.fecha] = [];
+      byFecha[c.fecha].push(c);
+    });
+    var cumIngreso = 0, cumEfectivo = 0, cumTarjetas = 0, cumGastos = 0, cumSaldo = 0, cumApertura = 0;
+    Object.keys(byFecha).forEach(function(fecha) {
+      var lista = byFecha[fecha];
+      var ultimo  = lista[lista.length - 1]; // último corte del día = estado final
+      var primero = lista[0];
+      cumApertura += parseFloat(primero.opening_balance) || 0;
+      cumIngreso  += parseFloat(ultimo.today_income) || 0;
+      cumEfectivo += parseFloat(ultimo.ingreso_efectivo) || 0;
+      cumTarjetas += (parseFloat(ultimo.tarjeta_credito)||0) + (parseFloat(ultimo.tarjeta_debito)||0);
+      cumGastos   += parseFloat(ultimo.total_expense) || 0;
+      cumSaldo    += parseFloat(ultimo.saldo_sistema) || 0;
+    });
+
+    // Solo estas columnas se suman entre cortes (son incrementales)
+    var totContado = 0, totDif = 0;
+    cortes.forEach(function(c) {
+      totContado += parseFloat(c.efectivo_contado) || 0;
+      totDif     += parseFloat(c.diferencia) || 0;
+    });
+
     var apertura0 = parseFloat(cortes[0].opening_balance) || 0;
 
     cortes.forEach(function(c, i) {
       var tarjetas = (parseFloat(c.tarjeta_credito)||0) + (parseFloat(c.tarjeta_debito)||0);
       var dif = parseFloat(c.diferencia) || 0;
-      totIngresos += parseFloat(c.today_income) || 0;
-      totEfectivo += parseFloat(c.ingreso_efectivo) || 0;
-      totTarjetas += tarjetas;
-      totGastos   += parseFloat(c.total_expense) || 0;
-      totSaldo    += parseFloat(c.saldo_sistema) || 0;
-      totContado  += parseFloat(c.efectivo_contado) || 0;
       var hora = c.hora_corte ? c.hora_corte.substring(11, 19) : '—';
       var fechaCorte = c.fecha || '';
       <?php $isAdmin = (user_group_id() == 1); ?>
@@ -569,11 +635,13 @@ include ("left_sidebar.php") ;
         <?php if (user_group_id() == 1): ?>
         '<td class="text-center no-print">' +
           '<button class="btn btn-xs btn-default btn-ver-corte" data-idx="' + i + '" title="Ver detalle"><i class="fa fa-eye"></i></button> ' +
+          '<button class="btn btn-xs btn-info btn-print-corte" data-idx="' + i + '" title="Imprimir ticket"><i class="fa fa-print"></i></button> ' +
           '<button class="btn btn-xs btn-danger btn-del-corte" data-id="' + c.id + '" title="Eliminar"><i class="fa fa-trash"></i></button>' +
         '</td>' +
         <?php else: ?>
         '<td class="text-center no-print">' +
-          '<button class="btn btn-xs btn-default btn-ver-corte" data-idx="' + i + '" title="Ver detalle"><i class="fa fa-eye"></i></button>' +
+          '<button class="btn btn-xs btn-default btn-ver-corte" data-idx="' + i + '" title="Ver detalle"><i class="fa fa-eye"></i></button> ' +
+          '<button class="btn btn-xs btn-info btn-print-corte" data-idx="' + i + '" title="Imprimir ticket"><i class="fa fa-print"></i></button>' +
         '</td>' +
         <?php endif; ?>
         '</tr>';
@@ -581,13 +649,20 @@ include ("left_sidebar.php") ;
     $tbody.html(html);
 
     // Totales en tfoot
-    $('#tfoot-apertura').text('$' + fmt(apertura0));
-    $('#tfoot-ingreso').text('$' + fmt(totIngresos));
-    $('#tfoot-efectivo').text('$' + fmt(totEfectivo));
-    $('#tfoot-tarjetas').text('$' + fmt(totTarjetas));
-    $('#tfoot-gastos').text('$' + fmt(totGastos));
-    $('#tfoot-saldo').text('$' + fmt(totSaldo));
+    // Columnas acumuladas: valor del último corte por día (no suma)
+    $('#tfoot-label').attr('colspan', isRange ? 3 : 2);
+    $('#tfoot-apertura').text('$' + fmt(cumApertura));
+    $('#tfoot-ingreso').text('$' + fmt(cumIngreso));
+    $('#tfoot-efectivo').text('$' + fmt(cumEfectivo));
+    $('#tfoot-tarjetas').text('$' + fmt(cumTarjetas));
+    $('#tfoot-gastos').text('$' + fmt(cumGastos));
+    $('#tfoot-saldo').text('$' + fmt(cumSaldo));
+    // Columnas incrementales: suma real entre cortes
     $('#tfoot-contado').text('$' + fmt(totContado));
+    $('#tfoot-diferencia')
+      .removeClass('text-success text-danger')
+      .addClass(totDif >= 0 ? 'text-success' : 'text-danger')
+      .text(difFmt(totDif));
     $tfoot.show();
   }
 
@@ -615,6 +690,31 @@ include ("left_sidebar.php") ;
         $('#corte-efectivo-contado').val('');
         $('#corte-diferencia-row').hide();
         $('#corte-notas').val('');
+
+        // Mostrar info de cortes previos e incrementales
+        // inc_esperado = Saldo Sistema − Tarjetas (incremental): efectivo físico que debe haber
+        var incEsperado = res.inc_esperado;
+
+        // incEsperado llega como número float desde PHP (sin comas) → parseFloat funciona correctamente
+        var incEsperadoFmt = fmt(incEsperado); // formateado solo para mostrar
+
+        if (res.has_prev) {
+          $('#corte-last-hora').text(res.last_hora);
+          $('#corte-inc-efectivo').text(incEsperadoFmt);
+          $('#corte-row-inc').show();
+          $('#corte-alerta-previo').show();
+          $('#corte-alerta-normal').hide();
+          $('#corte-dif-label').text('Contado vs Efectivo esperado desde último corte (' + res.last_hora + ')');
+        } else {
+          $('#corte-inc-efectivo').text(incEsperadoFmt);
+          $('#corte-row-inc').show();
+          $('#corte-alerta-normal').show();
+          $('#corte-alerta-previo').hide();
+          $('#corte-dif-label').text('Contado vs Efectivo esperado en caja (Saldo − Tarjetas)');
+        }
+        // Guardar como número: parseFloat(number) funciona sin stripping de comas
+        $('#corte-efectivo-contado').data('inc-efectivo', incEsperado);
+
         $('#modal-corte-caja').modal('show');
       },
       error: function() {
@@ -626,9 +726,9 @@ include ("left_sidebar.php") ;
   /* ─── Calcular diferencia en tiempo real ─── */
   $(document).on('input', '#corte-efectivo-contado', function() {
     var contado      = parseFloat($(this).val().replace(/,/g,'')) || 0;
-    // Comparar solo contra el ingreso en efectivo del día (no contra Saldo Sistema)
-    var efectivoText = $('#corte-efectivo').text().replace(/[$,]/g,'');
-    var efectivo     = parseFloat(efectivoText) || 0;
+    // Comparar contra el efectivo incremental desde el último corte
+    var incEfectivo  = parseFloat($(this).data('inc-efectivo') || '0') || 0;
+    var efectivo     = incEfectivo;
     var dif          = contado - efectivo;
     var clase        = dif >= 0 ? 'text-success' : 'text-danger';
     $('#corte-diferencia').removeClass('text-success text-danger').addClass(clase)
@@ -641,22 +741,23 @@ include ("left_sidebar.php") ;
     var $btn = $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Guardando...');
     var notas        = $('#corte-notas').val();
     var saldoText       = $('#corte-saldo-final').text().replace(/[$,]/g,'');
-    var efectivoText    = $('#corte-efectivo').text().replace(/[$,]/g,'');
+    var incEfectivo     = $('#corte-efectivo-contado').data('inc-efectivo') || '0';
     var efectivoContado = $('#corte-efectivo-contado').val().replace(/,/g,'');
     if (!efectivoContado || parseFloat(efectivoContado) === 0) {
-      efectivoContado = efectivoText; // si no se ingresó, asumir que cuadra con el efectivo del día
+      efectivoContado = incEfectivo; // si no se ingresó, asumir que cuadra con el efectivo incremental
     }
     $.ajax({
       url: window.baseUrl + '/_inc/ajax.php?type=CORTEDECAJA',
       dataType: 'JSON',
       type: 'POST',
-      data: { efectivo_contado: efectivoContado, notas: notas, saldo_final: saldoText, ingreso_efectivo: efectivoText },
+      data: { efectivo_contado: efectivoContado, notas: notas, saldo_final: saldoText, ingreso_efectivo: incEfectivo },
       success: function(res) {
         $('#modal-corte-caja').modal('hide');
+        lockSaldoApertura();
         window.swal('Corte Registrado', res.msg, 'success')
           .then(function() {
             cargarCortes();
-            cargarResumen(); // refrescar el resumen con datos actuales
+            cargarResumen();
           });
       },
       error: function(xhr) {
@@ -671,11 +772,57 @@ include ("left_sidebar.php") ;
     });
   });
 
+  /* ─── Imprimir ticket de corte de caja vía QZ Tray ─── */
+  function printTicketCorte(c) {
+    if (!c || !c.id) return;
+
+    var $toastr = window.toastr.info('Conectando con impresora...', '', { timeOut: 0, extendedTimeOut: 0 });
+
+    function clearMsg() { window.toastr.clear($toastr); }
+
+    // Modo unsigned — uso interno en red local
+    qz.security.setCertificatePromise(function(resolve) { resolve(); });
+    qz.security.setSignaturePromise(function() { return function(resolve) { resolve(); }; });
+
+    $.get(window.baseUrl + '/_inc/print_corte.php', { corte_id: c.id, mode: 'data' })
+      .done(function(response) {
+        var printData = [{ type: 'raw', format: 'base64', data: response.data }];
+
+        (qz.websocket.isActive() ? Promise.resolve() : qz.websocket.connect())
+          .then(function() { return qz.printers.find(response.printer_name); })
+          .then(function(printer) { return qz.print(qz.configs.create(printer), printData); })
+          .then(function() {
+            clearMsg();
+            window.toastr.success('Ticket impreso correctamente');
+          })
+          .catch(function(err) {
+            clearMsg();
+            var msg = typeof err === 'string' ? err : (err && err.message ? err.message : 'Error al imprimir');
+            window.swal('Error de impresión', msg, 'error');
+          })
+          .finally(function() {
+            if (qz.websocket.isActive()) qz.websocket.disconnect();
+          });
+      })
+      .fail(function(xhr) {
+        clearMsg();
+        try {
+          var err = JSON.parse(xhr.responseText);
+          window.swal('Error', err.errorMsg, 'error');
+        } catch(e) {
+          window.swal('Error', 'No se pudo preparar el ticket de impresión', 'error');
+        }
+      });
+  }
+
   /* ─── Ver detalle de un corte ─── */
+  var currentCorteDetalle = null;
+
   $(document).on('click', '.btn-ver-corte', function() {
     var idx = $(this).data('idx');
     var c   = cortesData[idx];
     if (!c) return;
+    currentCorteDetalle = c;
     var hora = c.hora_corte ? c.hora_corte.substring(11,19) : '—';
     var tarjetas = (parseFloat(c.tarjeta_credito)||0) + (parseFloat(c.tarjeta_debito)||0);
     var dif = parseFloat(c.diferencia) || 0;
@@ -701,9 +848,15 @@ include ("left_sidebar.php") ;
     $('#modal-detalle-corte').modal('show');
   });
 
-  /* ─── Imprimir detalle ─── */
+  /* ─── Imprimir ticket desde modal de detalle ─── */
   $(document).on('click', '#btn-imprimir-detalle', function() {
-    window.print();
+    printTicketCorte(currentCorteDetalle);
+  });
+
+  /* ─── Imprimir ticket directo desde fila del historial ─── */
+  $(document).on('click', '.btn-print-corte', function() {
+    var idx = $(this).data('idx');
+    printTicketCorte(cortesData[idx]);
   });
 
   /* ─── Eliminar corte ─── */
@@ -737,6 +890,22 @@ include ("left_sidebar.php") ;
       }
     });
   });
+
+  /* ─── Bloquear saldo apertura tras primer corte (sin recargar página) ─── */
+  function lockSaldoApertura() {
+    var $group = $('#balance-editable-group');
+    if (!$group.length) return; // ya bloqueado desde PHP o no es hoy
+    var val = $('#opening-balance').val();
+    $group.replaceWith(
+      '<div class="input-group">' +
+        '<div class="input-group-addon bg-default" style="cursor:default;" title="Bloqueado: ya existe un corte registrado hoy">' +
+          '<i class="fa fa-lock text-muted"></i>' +
+        '</div>' +
+        '<input style="font-size:22px;font-weight:700;background:#f5f5f5;color:#888;" class="form-control text-center" type="text" value="' + val + '" disabled>' +
+      '</div>' +
+      '<small class="text-muted" id="lbl-balance-locked"><i class="fa fa-info-circle"></i> No editable: ya existe un corte registrado.</small>'
+    );
+  }
 
   /* ─── Botón actualizar saldo apertura ─── */
   $(document).on('click', '#btn-update-balance', function(e) {

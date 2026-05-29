@@ -362,17 +362,63 @@ if ($request->server['REQUEST_METHOD'] == 'GET' AND $request->get['type'] == 'GE
 if ($request->server['REQUEST_METHOD'] == 'GET' AND $request->get['type'] == 'GETCASHBOOKSUMMARY') {
 	try {
 		$from = date('Y-m-d');
-		$opening_balance   = get_opening_balance($from);
-		$today_income      = get_total_income($from, $from);
-		$tarjeta_credito   = get_pagos_tarjeta_credito($from, $from);
-		$tarjeta_debito    = get_pagos_tarjeta_debito($from, $from);
-		$ingreso_efectivo  = max(0, $today_income - $tarjeta_credito - $tarjeta_debito);
-		$total_expense     = get_total_expense($from, $from);
-		$total_income      = $opening_balance + $today_income;
-		$saldo_final       = $total_income - $total_expense;
+
+		// Totales acumulados del día completo
+		$opening_balance  = get_opening_balance($from);
+		$today_income     = get_total_income($from, $from);
+		$tarjeta_credito  = get_pagos_tarjeta_credito($from, $from);
+		$tarjeta_debito   = get_pagos_tarjeta_debito($from, $from);
+		$ingreso_efectivo = max(0, $today_income - $tarjeta_credito - $tarjeta_debito);
+		$total_expense    = get_total_expense($from, $from);
+		$total_income     = $opening_balance + $today_income;
+		$saldo_final      = $total_income - $total_expense;
+
+		// Buscar el último corte registrado hoy para calcular incrementales
+		$stmt = db()->prepare("
+			SELECT hora_corte, today_income, ingreso_efectivo, tarjeta_credito,
+			       tarjeta_debito, total_expense, saldo_sistema
+			FROM corte_caja
+			WHERE store_id = ? AND fecha = ?
+			ORDER BY hora_corte DESC
+			LIMIT 1
+		");
+		$stmt->execute(array(store_id(), $from));
+		$last = $stmt->fetch(PDO::FETCH_ASSOC);
+
+		// Efectivo esperado físico = Saldo Sistema − Tarjetas
+		// Regla: la caja física contiene apertura + cobros en efectivo − gastos pagados en cash.
+		// Los cobros con tarjeta no entran físicamente, así que se restan del saldo sistema.
+		$tarjetas_total = (float)$tarjeta_credito + (float)$tarjeta_debito;
+		$esperado_total = (float)$saldo_final - $tarjetas_total; // puede ser 0 o negativo
+
+		if ($last) {
+			// Valores incrementales desde el último corte
+			$inc_income   = (float)$today_income    - (float)$last['today_income'];
+			$inc_efectivo = (float)$ingreso_efectivo - (float)$last['ingreso_efectivo'];
+			$inc_credito  = (float)$tarjeta_credito  - (float)$last['tarjeta_credito'];
+			$inc_debito   = (float)$tarjeta_debito   - (float)$last['tarjeta_debito'];
+			$inc_expense  = (float)$total_expense    - (float)$last['total_expense'];
+			$inc_saldo    = (float)$saldo_final      - (float)$last['saldo_sistema'];
+			$last_hora    = substr($last['hora_corte'], 11, 8);
+			// Efectivo esperado incremental = Δ(Saldo − Tarjetas)
+			$prev_esperado = (float)$last['saldo_sistema']
+			               - ((float)$last['tarjeta_credito'] + (float)$last['tarjeta_debito']);
+			$inc_esperado  = $esperado_total - $prev_esperado;
+		} else {
+			// Sin cortes previos: el esperado es el saldo efectivo del día completo
+			$inc_income   = (float)$today_income;
+			$inc_efectivo = (float)$ingreso_efectivo;
+			$inc_credito  = (float)$tarjeta_credito;
+			$inc_debito   = (float)$tarjeta_debito;
+			$inc_expense  = (float)$total_expense;
+			$inc_saldo    = (float)$saldo_final;
+			$last_hora    = null;
+			$inc_esperado = $esperado_total;
+		}
 
 		header('Content-Type: application/json');
 		echo json_encode(array(
+			// Acumulados del día
 			'opening_balance'  => number_format($opening_balance, 2),
 			'today_income'     => number_format($today_income, 2),
 			'ingreso_efectivo' => number_format($ingreso_efectivo, 2),
@@ -380,6 +426,18 @@ if ($request->server['REQUEST_METHOD'] == 'GET' AND $request->get['type'] == 'GE
 			'tarjeta_debito'   => number_format($tarjeta_debito, 2),
 			'total_expense'    => number_format($total_expense, 2),
 			'saldo_final'      => number_format($saldo_final, 2),
+			// Incrementales desde último corte
+			'inc_income'       => number_format($inc_income, 2),
+			'inc_efectivo'     => number_format($inc_efectivo, 2),
+			'inc_credito'      => number_format($inc_credito, 2),
+			'inc_debito'       => number_format($inc_debito, 2),
+			'inc_expense'      => number_format($inc_expense, 2),
+			'inc_saldo'        => number_format($inc_saldo, 2),
+			// Efectivo físico esperado en caja (Saldo Sistema − Tarjetas, incremental)
+			// Se envía como número (sin format) para que JS parseFloat funcione sin commas
+			'inc_esperado'     => round((float)$inc_esperado, 2),
+			'has_prev'         => ($last !== false),
+			'last_hora'        => $last_hora,
 		));
 		exit();
 	} catch (Exception $e) {
@@ -406,7 +464,7 @@ if ($request->server['REQUEST_METHOD'] == 'POST' AND $request->get['type'] == 'C
 		$notas            = isset($request->post['notas']) ? trim($request->post['notas']) : '';
 		$saldo_final      = is_numeric($saldo_final) ? (float)$saldo_final : 0;
 
-		// Obtener datos reales del día (fuente de verdad: servidor)
+		// Obtener totales acumulados del día (fuente de verdad: servidor)
 		// Se pasa $from como $to para forzar filtro de día exacto (no rango multi-día)
 		$opening_balance   = get_opening_balance($from);
 		$today_income      = get_total_income($from, $from);
@@ -415,12 +473,36 @@ if ($request->server['REQUEST_METHOD'] == 'POST' AND $request->get['type'] == 'C
 		$ingreso_efectivo  = max(0, $today_income - $tarjeta_credito - $tarjeta_debito);
 		$total_expense     = get_total_expense($from, $from);
 
-		// Si no se ingresó efectivo contado, asumir que cuadra con el efectivo del día
-		$efectivo_contado = (is_numeric($efectivo_contado) && (float)$efectivo_contado > 0)
+		// Efectivo físico esperado en caja = Saldo Sistema − Tarjetas
+		// Regla: incluye apertura y gastos; los cobros con tarjeta NO van a caja física
+		$saldo_sistema_actual = (float)$opening_balance + (float)$today_income - (float)$total_expense;
+		$tarjetas_acum        = (float)$tarjeta_credito + (float)$tarjeta_debito;
+		$esperado_total       = $saldo_sistema_actual - $tarjetas_acum;
+
+		// Obtener el último corte para calcular el valor incremental esperado
+		$stmt_last = db()->prepare("
+			SELECT ingreso_efectivo, tarjeta_credito, tarjeta_debito, saldo_sistema
+			FROM corte_caja
+			WHERE store_id = ? AND fecha = ?
+			ORDER BY hora_corte DESC LIMIT 1
+		");
+		$stmt_last->execute(array(store_id(), $from));
+		$last_corte = $stmt_last->fetch(PDO::FETCH_ASSOC);
+
+		if ($last_corte) {
+			$prev_esperado        = (float)$last_corte['saldo_sistema']
+			                      - ((float)$last_corte['tarjeta_credito'] + (float)$last_corte['tarjeta_debito']);
+			$efectivo_esperado_inc = $esperado_total - $prev_esperado;
+		} else {
+			$efectivo_esperado_inc = $esperado_total; // primer corte: todo el efectivo físico del día
+		}
+
+		// Si no se ingresó efectivo contado, asumir que cuadra con el esperado
+		$efectivo_contado = (is_numeric($efectivo_contado) && (float)$efectivo_contado != 0)
 			? (float)$efectivo_contado
-			: (float)$ingreso_efectivo;
-		// Diferencia: efectivo físico contado vs ingreso en efectivo del sistema
-		$diferencia = $efectivo_contado - (float)$ingreso_efectivo;
+			: $efectivo_esperado_inc;
+		// Diferencia: lo físicamente contado vs lo que el sistema espera en caja
+		$diferencia = $efectivo_contado - $efectivo_esperado_inc;
 
 		// Asegurar que exista registro en pos_register
 		$statement = db()->prepare("SELECT `id` FROM `pos_register` WHERE $where_query AND `store_id` = ?");
