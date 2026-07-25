@@ -219,7 +219,7 @@ include ("left_sidebar.php") ;
                           <div class="input-group-addon pointer bg-blue" id="btn-update-balance" title="<?php echo trans('button_save'); ?>">
                             <i class="fa fa-pencil"></i>
                           </div>
-                          <input style="font-size:22px;font-weight:700;" id="opening-balance" class="form-control text-center" type="text" value="<?php echo currency_format($openinig_balance);?>" name="opening_balance" onkeypress="return IsNumeric(event);" ondrop="return false;" onpaste="return false;">
+                          <input style="font-size:22px;font-weight:700;" id="opening-balance" class="form-control text-center" type="text" value="<?php echo currency_format($openinig_balance);?>" name="opening_balance" onkeypress="return IsNumeric(event);" ondrop="return false;" onpaste="return false;" onclick="this.select();">
                         </div>
                       <?php endif; ?>
                     <?php else:?>

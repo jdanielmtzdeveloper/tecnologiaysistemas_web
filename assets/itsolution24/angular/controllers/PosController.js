@@ -83,6 +83,8 @@ function (
     // Start Customer dropdown list
     // ===============================================
 
+    // CLIENTE MOSTRADOR: default walk-in customer, linked to every store
+    var DEFAULT_CUSTOMER_ID = 215;
     $scope.customerName = "";
     $scope.customerMobileNumber = "";
     $scope.dueAmount = 0;
@@ -123,7 +125,7 @@ function (
     $("#customer-name").on("click", function() {
         $scope.showCustomerList(true);
     });
-    $scope.addCustomer = function (customer) {
+    $scope.addCustomer = function (customer, callback) {
         if ($scope._isInt(customer)) {
             $http({
                 url: API_URL + "/_inc/pos.php?customer_id="+customer+"&action_type=CUSTOMER",
@@ -135,7 +137,7 @@ function (
             }).
             then(function(response) {
                 if (response.data.customer_id) {
-                    $scope.addCustomer(response.data);
+                    $scope.addCustomer(response.data, callback);
                 }
             }, function(response) {
                 if (window.store.sound_effect == 1) {
@@ -156,6 +158,7 @@ function (
             $scope.orderData.info = ob_info;
             $scope.billData.info = ob_info;
             $scope._calcTotalPayable();
+            if (typeof callback === "function") { callback(); }
         } else {
             if (window.store.sound_effect == 1) {
                 window.storeApp.playSound("error.mp3");
@@ -167,7 +170,7 @@ function (
         $scope.addCustomer(window.getParameterByName("customer_id"));
     } else {
         // add walking customer to invoice
-        $scope.addCustomer(1);
+        $scope.addCustomer(DEFAULT_CUSTOMER_ID);
     }
 
     // ===============================================
@@ -234,6 +237,11 @@ function (
         });
     };
     $scope.showProductList();
+    if (window.deviceType == 'computer') {
+        setTimeout(function() {
+            $("#product-name").focus();
+        }, 300);
+    }
 
     $(document).delegate(".pos-product-pagination li > a", "click", function(e) {
         e.preventDefault();
@@ -838,7 +846,7 @@ function (
             $scope.discountInput    = 0;
             $scope.shippingInput    = 0;
             $scope.othersChargeInput= 0;
-            $scope.addCustomer(1);
+            $scope.addCustomer(DEFAULT_CUSTOMER_ID);
             $("#invoice-note").data("note", "");
             $scope.resetBillandOrderItems();
             $scope.showProductList();
@@ -1016,12 +1024,17 @@ function (
             return false;
         }
         if (!$scope.customerName) {
-            if (window.store.sound_effect == 1) {
-                window.storeApp.playSound("error.mp3");
-            }
-            window.toastr.error("Please, select a customer", "Warning!");
+            // No customer selected: default to CLIENTE MOSTRADOR
+            $scope.addCustomer(DEFAULT_CUSTOMER_ID, function() {
+                if ($("#customer-mobile-number").val()) {
+                    $scope.customerMobileNumber = $("#customer-mobile-number").val();
+                }
+                setTimeout(function() {
+                    PaymentFormModal($scope);
+                }, 300);
+            });
             return false;
-        } 
+        }
         $scope.customerId = $(document).find("input[name=\"customer-id\"]").val();
         if ($("#customer-mobile-number").val()) {
             $scope.customerMobileNumber = $("#customer-mobile-number").val();
@@ -1306,7 +1319,7 @@ function (
     $scope.createNewCustomer = function () {
         if ($scope.invoiceId) return false;
         $scope.dueAmount = 0;
-        $scope.addCustomer(1);
+        $scope.addCustomer(DEFAULT_CUSTOMER_ID);
         CustomerCreateModal($scope);
     };
 
