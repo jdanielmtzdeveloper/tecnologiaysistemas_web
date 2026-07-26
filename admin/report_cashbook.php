@@ -192,6 +192,9 @@ include ("left_sidebar.php") ;
             <i class="fa fa-lock"></i> CORTE DE CAJA
           </button>
           <?php endif; ?>
+          <a class="pointer" href="export_cashbook_excel.php?from=<?php echo $from; ?>&to=<?php echo $to; ?>" title="Exportar a Excel">
+            <i class="fa fa-file-excel-o"></i> Exportar a Excel
+          </a>
           <a class="pointer" onClick="window.printContent('cashbook-summary', {title:'<?php echo trans('title_cashbook').' - '.$print_date;?>', 'headline':'<?php echo trans('title_cashbook').' - '.$print_date;?>', screenSize:'fullScreen'});">
             <i class="fa fa-print"></i> <?php echo trans('text_print');?>
           </a>
