@@ -79,9 +79,10 @@ $permissions = array(
     'read_sell_return' => 'View Return List',
     'update_sell_return' => 'Update Return',
     'delete_sell_return' => 'Delete Return',
-    'sms_sell_invoice' => 'Send Sell Invoice via SMS', 
-    'email_sell_invoice' => 'Send Sell Invoice via Email', 
+    'sms_sell_invoice' => 'Send Sell Invoice via SMS',
+    'email_sell_invoice' => 'Send Sell Invoice via Email',
 	  'read_sell_log' => 'Read Sell Log',
+    'pos_apply_discount' => 'Apply Discount & Change Item Price (POS)',
   ),
   'purchase' => array(
     'create_purchase_invoice' => 'Create Invoice',

@@ -216,6 +216,7 @@ class ModelInvoice extends Model
             }
             $product_price = $product['item_price'];
             $product_total = $product['item_total'];
+            $item_discount = isset($product['item_discount']) && is_numeric($product['item_discount']) ? (float)$product['item_discount'] : $product_discount;
             $purchase_invoice_id = NULL;
             $item_purchase_price = 0;
             $tax_method = $product_info['tax_method'];
@@ -290,7 +291,7 @@ class ModelInvoice extends Model
                 $tigst += $tax;
             }
             $statement = $this->db->prepare("INSERT INTO `selling_item` (invoice_id, store_id, item_id, category_id, brand_id, sup_id, item_name, item_purchase_price, item_price, item_discount, item_tax, tax_method, taxrate_id, tax, gst, cgst, sgst, igst, item_quantity, item_total, purchase_invoice_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $statement->execute(array($invoice_id, $store_id, $product_id, $category_id, $brand_id, $sup_id, $product_name, $item_purchase_price, $product_price, $product_discount, $tax, $tax_method, $taxrate_id, $taxrate, $taxrate, $cgst, $sgst, $igst, $product_quantity, $product_total, $purchase_invoice_id));
+            $statement->execute(array($invoice_id, $store_id, $product_id, $category_id, $brand_id, $sup_id, $product_name, $item_purchase_price, $product_price, $item_discount, $tax, $tax_method, $taxrate_id, $taxrate, $taxrate, $cgst, $sgst, $igst, $product_quantity, $product_total, $purchase_invoice_id));
             $statement = $this->db->prepare("UPDATE `product_to_store` SET `quantity_in_stock` = `quantity_in_stock` - {$quantity_substract} WHERE `store_id` = ? AND `product_id` = ?");
             $statement->execute(array($store_id, $product_id));
         }

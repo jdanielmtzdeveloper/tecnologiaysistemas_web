@@ -1,5 +1,13 @@
-# php -- BEGIN cPanel-generated handler, do not edit
-# Configure el paquete “alt-php74” como el lenguaje de programación predeterminado “PHP”.
-<IfModule mime_module>
-  AddHandler application/x-httpd-alt-php74___lsphp .php .php7 .phtml
+
+
+# Reescritura de URLs
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # No reescribir archivos o directorios que existen
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    
+    # Reescribir todas las solicitudes a index.php
+    RewriteRule ^(.*)$ index.php [QSA,L]
 </IfModule>

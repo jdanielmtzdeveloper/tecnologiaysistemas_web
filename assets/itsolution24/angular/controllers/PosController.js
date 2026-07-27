@@ -392,6 +392,42 @@ function (
     $scope.addDiscount = function () {
         $scope._calcTotalPayable();
     };
+    $scope._calcItemDiscountValue = function (item) {
+        var base = parseFloat(item.baseSubTotal) || 0;
+        if (window._.includes(String(item.discountInput == null ? '' : item.discountInput), '%')) {
+            item.discountType = 'percentage';
+        } else {
+            item.discountType = 'plain';
+        }
+        var raw = parseFloat(item.discountInput);
+        if (!window.canApplyDiscount || !raw || raw < 0) {
+            item.discountAmount = 0;
+            item.discountInput = 0;
+            return 0;
+        }
+        item.discountAmount = raw;
+        var value = item.discountType == 'percentage' ? parseFloat($scope._percentage(base, raw)) : raw;
+        if (value > base) {
+            value = base;
+        }
+        return value;
+    };
+    $scope._recalcItemArray = function () {
+        var total = 0;
+        window._.map($scope.itemArray, function (item) {
+            item.itemDiscountValue = $scope._calcItemDiscountValue(item);
+            item.subTotal = (parseFloat(item.baseSubTotal) || 0) - item.itemDiscountValue;
+            total += item.subTotal;
+        });
+        $scope.totalAmount = total;
+    };
+    $scope.addItemDiscount = function (item) {
+        if (!window.canApplyDiscount) {
+            return false;
+        }
+        $scope._recalcItemArray();
+        $scope._calcTotalPayable();
+    };
     $scope.addTax = function () {
         $scope._calcTotalPayable();
     };
@@ -474,11 +510,11 @@ function (
                                 taxamount = parseFloat(response.data.tax_amount);
                                 $scope.itemTaxAmount = taxamount;
                             }
-                            item.subTotal = (item.subTotal + (parseFloat(response.data.sell_price) * qty)) + taxamount;
+                            item.baseSubTotal = ((parseFloat(item.baseSubTotal) || 0) + (parseFloat(response.data.sell_price) * qty)) + taxamount;
                             $scope.totalQuantity = $scope.totalQuantity + qty;
-                            $scope.totalAmount = $scope.totalAmount + (parseFloat(response.data.sell_price) * qty) + taxamount;
                         }
                     });
+                    $scope._recalcItemArray();
                 } else {
                     if ((qty > response.data.quantity_in_stock) && response.data.p_type != 'service') {
                         if (window.store.sound_effect == 1) {
@@ -509,10 +545,13 @@ function (
                     item.taxamount = taxamount;
                     item.price = parseFloat(response.data.sell_price) + additonalTaxAmount;
                     item.quantity = qty;
-                    item.subTotal = (parseFloat(response.data.sell_price) * qty) + additonalTaxAmount;
+                    item.baseSubTotal = (parseFloat(response.data.sell_price) * qty) + additonalTaxAmount;
+                    item.discountInput = 0;
+                    item.discountAmount = 0;
+                    item.discountType = 'plain';
                     $scope.totalQuantity = $scope.totalQuantity + qty;
-                    $scope.totalAmount = $scope.totalAmount + (parseFloat(response.data.sell_price) * qty) + additonalTaxAmount;
                     $scope.itemArray.push(item);
+                    $scope._recalcItemArray();
                 }
                 $scope.totalItem = window._.size($scope.itemArray);
                 $scope._calcTotalPayable();
@@ -583,9 +622,8 @@ function (
                             }
                             item.quantity = parseFloat(item.quantity) - qty;
                             $("#item_quantity_"+item.id).val(item.quantity);
-                            item.subTotal = item.subTotal - (parseFloat(item.price) * qty);
+                            item.baseSubTotal = (parseFloat(item.baseSubTotal) || 0) - (parseFloat(item.price) * qty);
                             $scope.totalQuantity = $scope.totalQuantity - qty;
-                            $scope.totalAmount = $scope.totalAmount - parseFloat(item.price);
                         } else {
                             if (window.store.sound_effect == 1) {
                                 window.storeApp.playSound("error.mp3");
@@ -594,6 +632,7 @@ function (
                         }
                     }
                 });
+                $scope._recalcItemArray();
             }
             $scope.totalItem = window._.size($scope.itemArray);
             $scope._calcTotalPayable();
@@ -625,12 +664,12 @@ function (
         window._.map($scope.itemArray, function (item, key) {
             if (item.id == id) {
                 $scope.totalQuantity = $scope.totalQuantity - item.quantity;
-                $scope.totalAmount = $scope.totalAmount - parseFloat(item.subTotal);
                 $scope.totalItem = $scope.totalItem - 1;
             }
         });
-        $scope._calcTotalPayable();
         $scope.itemArray.splice(index, 1);
+        $scope._recalcItemArray();
+        $scope._calcTotalPayable();
         $scope.totalItem = window._.size($scope.itemArray);
         $scope.setBillandOrderItems();
     };
@@ -703,7 +742,11 @@ function (
                         item.name = productItem.item_name;
                         item.price = window.getNumber(productItem.item_price);
                         item.quantity = window.getNumber(productItem.item_quantity);
-                        item.subTotal = parseFloat(productItem.item_price) * productItem.item_quantity;
+                        item.baseSubTotal = parseFloat(productItem.item_price) * productItem.item_quantity;
+                        item.subTotal = item.baseSubTotal;
+                        item.discountInput = 0;
+                        item.discountAmount = 0;
+                        item.discountType = 'plain';
                         $scope.totalItem = $scope.totalItem + 1;
                         $scope.totalQuantity = $scope.totalQuantity + parseInt(productItem.item_quantity);
                         $scope.itemArray.unshift(item);
@@ -794,7 +837,11 @@ function (
                         item.name = productItem.item_name;
                         item.price = window.getNumber(productItem.item_price);
                         item.quantity = window.getNumber(productItem.item_quantity);
-                        item.subTotal = parseFloat(productItem.item_price) * productItem.item_quantity;
+                        item.baseSubTotal = parseFloat(productItem.item_price) * productItem.item_quantity;
+                        item.subTotal = item.baseSubTotal;
+                        item.discountInput = 0;
+                        item.discountAmount = 0;
+                        item.discountType = 'plain';
                         $scope.totalItem = $scope.totalItem + 1;
                         $scope.totalQuantity = $scope.totalQuantity + parseInt(productItem.item_quantity);
                         $scope.itemArray.unshift(item);
@@ -1060,20 +1107,16 @@ function (
         e.stopImmediatePropagation();
         var  itemid = $(this).data("itemid");
         var  itemquantity = $(this).val();
-        var totalAmount = 0;
         window._.map($scope.itemArray, function (item) {
             if (item.id == itemid) {
                 item.quantity = itemquantity;
-                item.subTotal = item.price * itemquantity;
-                $scope.$applyAsync(function() {
-                    $scope.itemArray = $scope.itemArray;
-                });
+                item.baseSubTotal = item.price * itemquantity;
             }
-            totalAmount += item.subTotal;
-            $scope.$applyAsync(function() {
-                $scope.totalAmount = totalAmount;
-                $scope._calcTotalPayable();
-            });
+        });
+        $scope.$applyAsync(function() {
+            $scope.itemArray = $scope.itemArray;
+            $scope._recalcItemArray();
+            $scope._calcTotalPayable();
         });
         if ($scope.triggerKeyup == false) {
             $scope.error = false;
@@ -1131,27 +1174,23 @@ function (
     // Start Input Item Price Manually
     // =============================================    
 
-    if (window.settings.change_item_price_while_billing == 1) {
+    if (window.settings.change_item_price_while_billing == 1 && window.canApplyDiscount == 1) {
         $(document).delegate(".item_price", "keyup", function(e) {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
             var  itemid = $(this).data("itemid");
             var  itemprice = $(this).val();
-            var totalAmount = 0;
             window._.map($scope.itemArray, function (item) {
                 if (item.id == itemid) {
                     item.price = itemprice;
-                    item.subTotal = item.quantity * itemprice;
-                    $scope.$apply(function() {
-                        $scope.itemArray = $scope.itemArray;
-                    });
+                    item.baseSubTotal = item.quantity * itemprice;
                 }
-                totalAmount += item.subTotal;
-                $scope.$apply(function() {
-                    $scope.totalAmount = totalAmount;
-                    $scope._calcTotalPayable();
-                });
+            });
+            $scope.$apply(function() {
+                $scope.itemArray = $scope.itemArray;
+                $scope._recalcItemArray();
+                $scope._calcTotalPayable();
             });
         });
     }

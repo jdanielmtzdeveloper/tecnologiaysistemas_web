@@ -637,23 +637,27 @@ img {
 #invoice-item-head thead tr {
 	background-color: #f4f4f4;
 }
-#invoice-item-head thead tr th:nth-child(1) {
+#invoice-item-head thead tr th.product-quantity {
 	width: 50px;
 	text-align: center;
 }
-#invoice-item-head thead tr th:nth-child(2) {
+#invoice-item-head thead tr th.product-name {
 	width: 150px;
 	text-align: center;
 }
-#invoice-item-head thead tr th:nth-child(3) {
+#invoice-item-head thead tr th.product-price {
 	width: 50px;
 	text-align: right;
 }
-#invoice-item-head thead tr th:nth-child(4) {
+#invoice-item-head thead tr th.product-discount {
 	width: 70px;
 	text-align: right;
 }
-#invoice-item-head thead tr th:nth-child(5) {
+#invoice-item-head thead tr th.product-subtotal {
+	width: 70px;
+	text-align: right;
+}
+#invoice-item-head thead tr th.product-delete {
 	width: 15px;
 	text-align: left;
 }
@@ -713,6 +717,10 @@ img {
 }
 #invoice-item-list .invoice-item .product-price {
 	width: 50px;
+	text-align: right;
+}
+#invoice-item-list .invoice-item .product-discount {
+	width: 70px;
 	text-align: right;
 }
 #invoice-item-list .invoice-item .product-subtotal {

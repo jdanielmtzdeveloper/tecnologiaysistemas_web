@@ -13,6 +13,7 @@ if (user_group_id() != 1 && !has_permission('access', 'create_sell_invoice')) {
 	redirect(root_url() . '/' . ADMINDIRNAME . '/dashboard.php');
 }
 $user = isset($user) ? $user : null;
+$can_apply_discount = (user_group_id() == 1 || has_permission('access', 'pos_apply_discount'));
 $panel_position = $user ? ($user->getPreference('pos_side_panel') ? $user->getPreference('pos_side_panel') : 'right') : 'right';
 // ADD BODY CLASS
 $document->setBodyClass($panel_position . '-panel');
@@ -168,6 +169,7 @@ if ($order_printer_ids) {
 		var printer = <?php echo json_encode($printer); ?>;
 		var slideDirection = '<?php echo $user ? ($user->getPreference('pos_side_panel') == 'left' ? 'right' : 'left') : 'left'; ?>';
 		var sendReportEmail = '<?php echo user_group_id() == 1 || has_permission('access', 'send_report_via_email'); ?>';
+		var canApplyDiscount = <?php echo $can_apply_discount ? 1 : 0; ?>;
 	</script>
 
 </head>
@@ -357,19 +359,24 @@ if ($order_printer_ids) {
 									<table id="invoice-item-head" class="table table-striped">
 										<thead>
 											<tr class="bg-gray">
-												<th>
+												<th class="product-quantity">
 													<?php echo trans('label_quantity'); ?>
 												</th>
-												<th>
+												<th class="product-name">
 													<?php echo trans('label_product'); ?>
 												</th>
-												<th>
+												<th class="product-price">
 													<?php echo trans('label_price'); ?>
 												</th>
-												<th>
+												<?php if ($can_apply_discount) : ?>
+													<th class="product-discount">
+														<?php echo trans('label_discount'); ?>
+													</th>
+												<?php endif; ?>
+												<th class="product-subtotal">
 													<?php echo trans('label_subtotal'); ?>
 												</th>
-												<th>&nbsp; </th>
+												<th class="product-delete">&nbsp; </th>
 											</tr>
 										</thead>
 									</table>
@@ -395,12 +402,17 @@ if ($order_printer_ids) {
 														<span>{{ items.name }}</span>
 													</td>
 													<td class="product-price">
-														<?php if (get_preference('change_item_price_while_billing') == 1) : ?>
+														<?php if (get_preference('change_item_price_while_billing') == 1 && $can_apply_discount) : ?>
 															<input type="text" class="text-center item_price" id="item_price_{{ items.id }}" name="item_price_{{ items.id }}" value="{{ items.price | formatDecimal:2 }}" data-itemid="{{ items.id }}" onClick="this.select();" onkeypress="return IsNumeric(event);" ondrop="return false;" onpaste="return false;" style="max-width:80px;padding:5px;border-radius: 20px;border:2px solid #ddd;">
 														<?php else : ?>
 															{{ items.price | formatDecimal:2 }}
 														<?php endif; ?>
 													</td>
+													<?php if ($can_apply_discount) : ?>
+														<td class="product-discount">
+															<input type="text" class="text-center item_discount" id="item_discount_{{ items.id }}" name="item_discount_{{ items.id }}" ng-model="items.discountInput" ng-change="addItemDiscount(items)" onClick="this.select();" ondrop="return false;" onpaste="return false;" autocomplete="off" style="max-width:70px;padding:5px;border-radius: 20px;border:2px solid #ddd;">
+														</td>
+													<?php endif; ?>
 													<td class="product-subtotal">
 														{{ items.subTotal | formatDecimal:2 }}
 													</td>
@@ -436,7 +448,11 @@ if ($order_printer_ids) {
 														<?php echo trans('label_discount'); ?>
 													</td>
 													<td class="text-right">
-														<input id="discount-input" ng-change="addDiscount()" onClick="this.select();" type="text" name="discount-amount" ng-model="discountInput" ondrop="return false;" onpaste="return false;" autocomplete="off">
+														<?php if ($can_apply_discount) : ?>
+															<input id="discount-input" ng-change="addDiscount()" onClick="this.select();" type="text" name="discount-amount" ng-model="discountInput" ondrop="return false;" onpaste="return false;" autocomplete="off">
+														<?php else : ?>
+															{{ discountAmount | formatDecimal:2 }}
+														<?php endif; ?>
 													</td>
 													<td>
 														<?php echo trans('label_tax_amount'); ?> (%)

@@ -95,6 +95,27 @@ function validate_invoice_items($invoice_items)
     if (!validateFloat($product['item_total'])) {
       throw new Exception(trans('error_invoice_product_total'));
     }
+
+    // Validate product item discount, if present
+    if (isset($product['item_discount']) && !is_numeric($product['item_discount'])) {
+      throw new Exception(trans('error_invoice_product_discount'));
+    }
+  }
+}
+
+// Reject the request, if discount is supplied without the required permission
+function validate_discount_permission($discount_amount, $invoice_items)
+{
+  if (user_group_id() == 1 || has_permission('access', 'pos_apply_discount')) {
+    return;
+  }
+  if ((float)$discount_amount > 0) {
+    throw new Exception(trans('error_discount_permission'));
+  }
+  foreach ($invoice_items as $product) {
+    if (isset($product['item_discount']) && (float)$product['item_discount'] > 0) {
+      throw new Exception(trans('error_discount_permission'));
+    }
   }
 }
 
@@ -168,6 +189,8 @@ if ($request->server['REQUEST_METHOD'] == 'POST')
     }
 
     validate_invoice_items($product_items);
+
+    validate_discount_permission($request->post['discount-amount'], $product_items);
 
     $Hooks->do_action('Before_Place_POS_Order', $request);
 

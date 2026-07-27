@@ -146,6 +146,7 @@ $customer_id = isset($request->get['customer_id']) ? $request->get['customer_id'
 									<input type="hidden" name="product-item['{{ items.id }}'][item_price]" value="{{ items.price  | formatDecimal:2 }}">
 									<input type="hidden" name="product-item['{{ items.id }}'][item_quantity]" value="{{ items.quantity }}">
 									<input type="hidden" name="product-item['{{ items.id }}'][item_total]" value="{{ items.subTotal  | formatDecimal:2 }}">
+									<input type="hidden" name="product-item['{{ items.id }}'][item_discount]" value="{{ items.itemDiscountValue  | formatDecimal:2 }}">
 									{{ $index+1 }}
 								</td>
 								<td class="w-70">{{ items.name }} (x{{ items.quantity }} {{ items.unitName }})</td>
