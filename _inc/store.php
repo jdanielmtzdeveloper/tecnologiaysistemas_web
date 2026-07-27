@@ -298,6 +298,17 @@ if ($request->server['REQUEST_METHOD'] == 'POST' && isset($request->post['action
     $statement = db()->prepare("INSERT INTO `customer_to_store` SET `customer_id` = ?, `store_id` = ?");
     $statement->execute(array(1, $store_id));
 
+    // Add default "PUBLICO EN GENERAL" customer to the store
+    $statement = db()->prepare("INSERT INTO `customers` (customer_name, created_at) VALUES (?, ?)");
+    $statement->execute(array('PUBLICO EN GENERAL', date_time()));
+    $default_customer_id = db()->lastInsertId();
+
+    $statement = db()->prepare("INSERT INTO `customer_to_store` SET `customer_id` = ?, `store_id` = ?");
+    $statement->execute(array($default_customer_id, $store_id));
+
+    $statement = db()->prepare("UPDATE `stores` SET `default_customer_id` = ? WHERE `store_id` = ?");
+    $statement->execute(array($default_customer_id, $store_id));
+
     // Add cashier to the store
     $statement = db()->prepare("INSERT INTO `user_to_store` SET `user_id` = ?, `store_id` = ?");
     $statement->execute(array($request->post['cashier_id'], $store_id));

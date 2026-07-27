@@ -83,8 +83,8 @@ function (
     // Start Customer dropdown list
     // ===============================================
 
-    // CLIENTE MOSTRADOR: default walk-in customer, linked to every store
-    var DEFAULT_CUSTOMER_ID = 215;
+    // PUBLICO EN GENERAL: default walk-in customer, unique per store (see stores.default_customer_id)
+    var DEFAULT_CUSTOMER_ID = window.store.default_customer_id;
     $scope.customerName = "";
     $scope.customerMobileNumber = "";
     $scope.dueAmount = 0;
